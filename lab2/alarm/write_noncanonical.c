@@ -10,6 +10,10 @@
 #include <sys/stat.h>
 #include <termios.h>
 #include <unistd.h>
+#include "alarm.c"
+
+extern int alarmCount;
+extern int alarmEnabled;
 
 // Baudrate settings are defined in <asm/termbits.h>, which is
 // included by <termios.h>
@@ -19,13 +23,13 @@
 #define FALSE 0
 #define TRUE 1
 
+#define BUF_SIZE 256
+
 #define FLAG 0x7e
 #define A_S 0x03
 
 #define A_R 0x01
 #define C_R 0x07
-
-#define BUF_SIZE 256
 
 volatile int STOP = FALSE;
 
@@ -104,42 +108,50 @@ int main(int argc, char *argv[])
     buf[2] = A_S;
     buf[3] = A_S ^ A_S;
     buf[4] = FLAG; 
-
-    // In non-canonical mode, '\n' does not end the writing.
-    // Test this condition by placing a '\n' in the middle of the buffer.
-    // The whole buffer must be sent even with the '\n'.
     buf[5] = '\n';
 
-    int bytes = write(fd, buf, 5);
-    printf("%d bytes written\n", bytes);
+    (void)signal(SIGALRM, alarmHandler);
 
-    // Wait until all bytes have been written to the serial port
-    sleep(1);
+    while (alarmCount < 4 && alarmEnabled == FALSE){
 
-    // Recebe e mostra o que o reader retornou
-    unsigned char buf_UA[BUF_SIZE + 1] = {0};
+            // Set alarm to be triggered in 5s
+            alarm(3);
 
-    while (STOP == FALSE) {
-        int bytes_UA = read(fd, buf_UA, 5);
-        buf_UA[bytes_UA] = '\0';
+            //writes the msg
+            int bytes = write(fd, buf, 5);
+            printf("%d bytes written\n", bytes);
 
-        //Confere sucesso da FLAG
-        if (buf_UA[0] == FLAG && 
-            buf_UA[4] == FLAG && 
-            buf_UA[1] == A_R && 
-            buf_UA[2] == C_R && 
-            buf_UA[3]==A_R^C_R)
-            
-            printf("Mensagem recebida com sucesso.\n");
-        else
-            printf("Mensagem não recebida corretamente\n");
+            // Wait until all bytes have been written to the serial port
+            sleep(1);
 
-        printf("%d bytes read\n", bytes_UA);
-        printf(":%s:%d\n", buf, bytes);
-        if (buf_UA[bytes_UA] == '\0') {
-            STOP = TRUE;
-        }
+            // Recebe e mostra o que o reader retornou
+            unsigned char buf_UA[BUF_SIZE + 1] = {0};
+
+            int bytes_UA = read(fd, buf_UA, 5);
+            buf_UA[bytes_UA] = '\0';
+
+            //Confere sucesso da FLAG
+            if (buf_UA[0] == FLAG && 
+                buf_UA[4] == FLAG && 
+                buf_UA[1] == A_R && 
+                buf_UA[2] == C_R && 
+                buf_UA[3]==A_R^C_R)
+                
+                printf("Mensagem UA recebida com sucesso.\n");
+            else
+                printf("Mensagem UA não recebida corretamente\n");
+
+            printf("%d bytes read\n", bytes_UA);
+            printf(":%s:%d\n", buf, bytes);
+            if (buf_UA[bytes_UA] == '\0') {
+                alarmEnabled = TRUE;
+                alarm(0);
+                printf("Remaining alarms were disable\n");
+            }
+
     }
+
+    printf("Ending program\n");
 
     // Restore the old port settings
     if (tcsetattr(fd, TCSANOW, &oldtio) == -1)
