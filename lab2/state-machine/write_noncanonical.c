@@ -74,7 +74,7 @@ void alarmHandler(int signal)
         buf_UA[4] == FLAG && 
         buf_UA[1] == A_R && 
         buf_UA[2] == C_R && 
-        buf_UA[3]==A_R^C_R){
+        buf_UA[3]==(A_R^C_R)){
         
         printf("Mensagem UA recebida com sucesso.\n");
         if (buf_UA[bytes_UA] == '\0') {
