@@ -11,6 +11,9 @@
 #include <termios.h>
 #include <unistd.h>
 
+//from the alarm
+#include <signal.h>
+
 // Baudrate settings are defined in <asm/termbits.h>, which is
 // included by <termios.h>
 #define BAUDRATE B38400
@@ -19,15 +22,75 @@
 #define FALSE 0
 #define TRUE 1
 
+#define BUF_SIZE 256
+
 #define FLAG 0x7e
 #define A_S 0x03
 
 #define A_R 0x01
 #define C_R 0x07
 
-#define BUF_SIZE 256
-
 volatile int STOP = FALSE;
+
+int alarmEnabled = FALSE;
+int alarmCount = 0;
+
+int fd = -1;
+
+// Alarm function handler
+void alarmHandler(int signal)
+{   
+    alarmEnabled = FALSE;
+    alarmCount++;
+
+    printf("Alarm #%d\n", alarmCount);
+
+    // Create string to send
+    unsigned char buf[BUF_SIZE] = {0};
+
+    //Mensagem a enviar
+    buf[0] = FLAG;
+    buf[1] = A_S;
+    buf[2] = A_S;
+    buf[3] = A_S ^ A_S;
+    buf[4] = FLAG; 
+    buf[5] = '\n';
+
+    //writes the msg
+    int bytes = write(fd, buf, 5);
+    printf("%d bytes written\n", bytes);
+
+    // Wait until all bytes have been written to the serial port
+    //sleep(1);
+
+    // Recebe e mostra o que o reader retornou
+    unsigned char buf_UA[BUF_SIZE + 1] = {0};
+
+    int bytes_UA = read(fd, buf_UA, 5);
+    buf_UA[bytes_UA] = '\0';
+
+    //Confere sucesso da FLAG
+    if (buf_UA[0] == FLAG && 
+        buf_UA[4] == FLAG && 
+        buf_UA[1] == A_R && 
+        buf_UA[2] == C_R && 
+        buf_UA[3]==A_R^C_R){
+        
+        printf("Mensagem UA recebida com sucesso.\n");
+        if (buf_UA[bytes_UA] == '\0') {
+            alarm(0);
+            alarmCount = 4; //condiçao para sair do ciclo
+            printf("Remaining alarms were disable\n");
+        }
+    }
+    else{
+        printf("Mensagem UA não recebida corretamente:\n");
+        for (int i = 0; i < 5; i++){
+            printf("0x%02X\n", buf_UA[i]);
+        }
+    }
+
+}
 
 int main(int argc, char *argv[])
 {
@@ -46,7 +109,7 @@ int main(int argc, char *argv[])
 
     // Open serial port device for reading and writing, and not as controlling tty
     // because we don't want to get killed if linenoise sends CTRL-C.
-    int fd = open(serialPortName, O_RDWR | O_NOCTTY);
+    fd = open(serialPortName, O_RDWR | O_NOCTTY);
 
     if (fd < 0)
     {
@@ -95,51 +158,21 @@ int main(int argc, char *argv[])
 
     printf("New termios structure set\n");
 
-    // Create string to send
-    unsigned char buf[BUF_SIZE] = {0};
+    (void)signal(SIGALRM, alarmHandler);
 
-    //Mensagem a enviar
-    buf[0] = FLAG;
-    buf[1] = A_S;
-    buf[2] = A_S;
-    buf[3] = A_S ^ A_S;
-    buf[4] = FLAG; 
+    while (alarmCount < 4){
 
-    // In non-canonical mode, '\n' does not end the writing.
-    // Test this condition by placing a '\n' in the middle of the buffer.
-    // The whole buffer must be sent even with the '\n'.
-    buf[5] = '\n';
+            if(alarmEnabled == FALSE){
 
-    int bytes = write(fd, buf, 5);
-    printf("%d bytes written\n", bytes);
+                // Set alarm to be triggered in 3s
+                alarm(3);
+                alarmEnabled = TRUE;
 
-    // Wait until all bytes have been written to the serial port
-    sleep(1);
+            }    
 
-    // Recebe e mostra o que o reader retornou
-    unsigned char buf_UA[BUF_SIZE + 1] = {0};
-
-    while (STOP == FALSE) {
-        int bytes_UA = read(fd, buf_UA, 5);
-        buf_UA[bytes_UA] = '\0';
-
-        //Confere sucesso da FLAG
-        if (buf_UA[0] == FLAG && 
-            buf_UA[4] == FLAG && 
-            buf_UA[1] == A_R && 
-            buf_UA[2] == C_R && 
-            buf_UA[3]==A_R^C_R)
-            
-            printf("Mensagem recebida com sucesso.\n");
-        else
-            printf("Mensagem não recebida corretamente\n");
-
-        printf("%d bytes read\n", bytes_UA);
-        printf(":%s:%d\n", buf, bytes);
-        if (buf_UA[bytes_UA] == '\0') {
-            STOP = TRUE;
-        }
     }
+
+    printf("Ending program\n");
 
     // Restore the old port settings
     if (tcsetattr(fd, TCSANOW, &oldtio) == -1)

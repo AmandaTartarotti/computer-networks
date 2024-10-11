@@ -204,11 +204,15 @@ int main(int argc, char *argv[])
         buf_UA[0] = FLAG;
         buf_UA[1] = A_R;
         buf_UA[2] = C_R;
-        buf_UA[3] = A_R ^ C_R;
+        buf_UA[3] = (A_R) ^ (C_R);
         buf_UA[4] = FLAG; 
 
         int bytes_UA = write(fd, buf_UA, BUF_SIZE);
-        printf("%d bytes written\n", bytes);
+        printf("%d bytes written:\n", bytes);
+
+        for (int i = 0; i < 5; i++){
+            printf("0x%02X\n", buf_UA[i]);
+        }
 
         printf("%d bytes read\n", bytes);
         printf(":%s:%d\n", buf, bytes);
@@ -218,7 +222,7 @@ int main(int argc, char *argv[])
 
     // The while() cycle should be changed in order to respect the specifications
     // of the protocol indicated in the Lab guide
-
+    sleep(1);
     // Restore the old port settings
     if (tcsetattr(fd, TCSANOW, &oldtio) == -1)
     {
