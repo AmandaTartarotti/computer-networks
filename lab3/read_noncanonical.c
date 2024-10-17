@@ -28,6 +28,19 @@
 #define A_S 0x03
 #define A_C 0x03
 
+int data_size = 3;
+unsigned char data_field[3] = {0x20, 0x21, 0x22}; 
+
+// Na verdade ele deveria calculcar o bcc com base nos valores que ele recebe 
+unsigned char bcc_definer() {
+    unsigned char bcc2 = 0x00;
+    for (int i = 0; i < data_size; i++){
+        bcc2 = bcc2 ^ data_field[i];
+    }
+
+    return bcc2;
+}
+
 // Definir maquina de estados
 typedef enum {
   START,
@@ -35,6 +48,7 @@ typedef enum {
   A_RCV,
   C_RCV,
   BCC,
+  BCC2,
   STOP_RCV
 } state_set_msg;
 
@@ -86,7 +100,7 @@ int main(int argc, char *argv[])
     // Set input mode (non-canonical, no echo,...)
     newtio.c_lflag = 0;
     newtio.c_cc[VTIME] = 0; // Inter-character timer unused
-    newtio.c_cc[VMIN] = 5;  // Blocking read until 5 chars received
+    newtio.c_cc[VMIN] = 10;  // Blocking read until 5 chars received
 
     // VTIME e VMIN should be changed in order to protect with a
     // timeout the reception of the following character(s)
@@ -179,6 +193,26 @@ int main(int argc, char *argv[])
 
                 case BCC:
                     printf("Current state = BCC.\n");
+                    unsigned char bcc2 = bcc_definer();
+                    
+                    //Espera pelo data_size de 3 e confere o próximo resultado, vulgo o BCC2
+                    index += data_size;
+
+                    if (buf[index] == FLAG){
+                        cur_state = FLAG_RCV;
+                        index++;
+                    }
+                    if (buf[index] == bcc2){
+                        cur_state = BCC2;
+                        index++;
+                    }
+                    else 
+                        cur_state = STOP_RCV;
+                        // cur_state = START;
+                    break;
+                
+                case BCC2:
+                    printf("Current state = BCC2.\n");
                     //Se flag for recebida com sucesso avança para STOP e para próximo byte
                     if (buf[index] == FLAG){
                         printf("Mensagem recebida com sucesso.\n");

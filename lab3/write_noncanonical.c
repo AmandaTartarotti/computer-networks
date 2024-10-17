@@ -31,7 +31,7 @@
 #define C_R 0x07
 
 int data_size = 3;
-unsigned char data_field[data_size] = {0x20, 0x41, 0x42}; 
+unsigned char data_field[3] = {0x20, 0x21, 0x22}; 
 
 volatile int STOP = FALSE;
 
@@ -59,11 +59,11 @@ void writeMsg(){
     }
     index += data_size;
 
-    buf[index + 1] = error_checker; // data field checker
+    buf[index] = error_checker; // data field checker
 
     //Volta o resto do código como antes 
-    buf[index + 2] = FLAG; 
-    buf[index + 3] = '\n';
+    buf[index + 1] = FLAG; 
+    buf[index + 2] = '\n';
     //writes the msg
     int bytes = write(fd, buf, index + 3);
     printf("%d bytes written\n", bytes);
