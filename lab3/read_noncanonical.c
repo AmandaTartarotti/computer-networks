@@ -29,17 +29,6 @@
 #define A_C 0x03
 
 int data_size = 3;
-unsigned char data_field[3] = {0x20, 0x21, 0x22}; 
-
-// Na verdade ele deveria calculcar o bcc com base nos valores que ele recebe 
-unsigned char bcc_definer() {
-    unsigned char bcc2 = 0x00;
-    for (int i = 0; i < data_size; i++){
-        bcc2 = bcc2 ^ data_field[i];
-    }
-
-    return bcc2;
-}
 
 // Definir maquina de estados
 typedef enum {
@@ -193,7 +182,11 @@ int main(int argc, char *argv[])
 
                 case BCC:
                     printf("Current state = BCC.\n");
-                    unsigned char bcc2 = bcc_definer();
+
+                    unsigned char bcc2 = 0x00;
+                    for (int i = 0; i < data_size; i++){
+                        bcc2 = bcc2 ^ buf[i + index];
+                    }
                     
                     //Espera pelo data_size de 3 e confere o próximo resultado, vulgo o BCC2
                     index += data_size;
@@ -207,8 +200,7 @@ int main(int argc, char *argv[])
                         index++;
                     }
                     else 
-                        cur_state = STOP_RCV;
-                        // cur_state = START;
+                        cur_state = START;
                     break;
                 
                 case BCC2:
