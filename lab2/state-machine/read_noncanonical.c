@@ -42,6 +42,30 @@ state_set_msg cur_state = START;
 
 volatile int STOP = FALSE;
 
+int fd = -1;
+
+void writeUA(){
+        // Create string to send
+        unsigned char buf_UA[5] = {0};
+
+        //Mensagem a enviar
+        buf_UA[0] = FLAG;
+        buf_UA[1] = A_R;
+        buf_UA[2] = C_R;
+        // buf_UA[3] = 0xFF;
+        buf_UA[3] = A_R ^ C_R;
+        buf_UA[4] = FLAG; 
+
+        //Envia a mensagem
+
+        int bytes_UA = write(fd, buf_UA, 5);
+        printf("%d bytes written:\n", bytes_UA);
+
+        for (int i = 0; i < 5; i++){
+            printf("0x%02X\n", buf_UA[i]);
+        }
+}
+
 int main(int argc, char *argv[])
 {
     // Program usage: Uses either COM1 or COM2
@@ -59,7 +83,7 @@ int main(int argc, char *argv[])
 
     // Open serial port device for reading and writing and not as controlling tty
     // because we don't want to get killed if linenoise sends CTRL-C.
-    int fd = open(serialPortName, O_RDWR | O_NOCTTY);
+    fd = open(serialPortName, O_RDWR | O_NOCTTY);
     if (fd < 0)
     {
         perror(serialPortName);
@@ -85,7 +109,7 @@ int main(int argc, char *argv[])
 
     // Set input mode (non-canonical, no echo,...)
     newtio.c_lflag = 0;
-    newtio.c_cc[VTIME] = 0; // Inter-character timer unused
+    newtio.c_cc[VTIME] = 0.1; // Inter-character timer unused
     newtio.c_cc[VMIN] = 5;  // Blocking read until 5 chars received
 
     // VTIME e VMIN should be changed in order to protect with a
@@ -117,103 +141,84 @@ int main(int argc, char *argv[])
         int index = 0;
 
         
-            //Confere sucesso da FLAG e da mensagem com State Machine
-            switch(cur_state){
-                case START:
-                    printf("Current state = START.\n");
+        //Confere sucesso da FLAG e da mensagem com State Machine
+        switch(cur_state){
+            case START:
+                printf("Current state = START.\n");
 
-                    //se a flag for recebida corretamente, avança para FLAG_RCV
-                    if (buf[index] == FLAG){
-                        cur_state = FLAG_RCV;
-                    }
+                //se a flag for recebida corretamente, avança para FLAG_RCV
+                if (buf[index] == FLAG){
+                    cur_state = FLAG_RCV;
+                }
+                break;
+
+            case FLAG_RCV:
+                printf("Current state = FLAG_RCV.\n");
+                //Se A_S for recebido com sucesso avança para A_RCV 
+                if (buf[index] == A_S){
+                    cur_state = A_RCV;
+                }
+                // se a flag for recebida de novo, continua aqui
+                else if (buf[index] == FLAG)
                     break;
+                // se recebe um valor desconhecido, volta ao START
+                else 
+                    cur_state = START;
+                break;
 
-                case FLAG_RCV:
-                    printf("Current state = FLAG_RCV.\n");
-                    //Se A_S for recebido com sucesso avança para A_RCV 
-                    if (buf[index] == A_S){
-                        cur_state = A_RCV;
-                    }
-                    // se a flag for recebida de novo, continua aqui
-                    else if (buf[index] == FLAG)
-                        break;
-                    // se recebe um valor desconhecido, volta ao START
-                    else 
-                        cur_state = START;
-                    break;
+            case A_RCV:
+                printf("Current state = A_RCV.\n");
+                //Se flag for recebida, volta para FLAG
+                if (buf[index] == FLAG){
+                    cur_state = FLAG_RCV;
+                }
+                //Se A_C for recebido com sucesso avança para C_RCV
+                else if (buf[index] == A_C){
+                    cur_state = C_RCV;
+                }
+                else 
+                    cur_state = START;
+                break;
 
-                case A_RCV:
-                    printf("Current state = A_RCV.\n");
-                    //Se flag for recebida, volta para FLAG
-                    if (buf[index] == FLAG){
-                        cur_state = FLAG_RCV;
-                    }
-                    //Se A_C for recebido com sucesso avança para C_RCV
-                    else if (buf[index] == A_C){
-                        cur_state = C_RCV;
-                    }
-                    else 
-                        cur_state = START;
-                    break;
+            case C_RCV:
+                printf("Current state = C_RCV.\n");
+                //Se flag for recebida, volta para FLAG
+                if (buf[index] == FLAG){
+                    cur_state = FLAG_RCV;
+                }
+                //Se A_C^A_S for recebido com sucesso avança para BCC
+                else if (buf[index] == A_C^A_S){
+                    cur_state = BCC;
+                }
+                else 
+                    cur_state = START;
+                break;
 
-                case C_RCV:
-                    printf("Current state = C_RCV.\n");
-                    //Se flag for recebida, volta para FLAG
-                    if (buf[index] == FLAG){
-                        cur_state = FLAG_RCV;
-                    }
-                    //Se A_C^A_S for recebido com sucesso avança para BCC
-                    else if (buf[index] == A_C^A_S){
-                        cur_state = BCC;
-                    }
-                    else 
-                        cur_state = START;
-                    break;
+            case BCC:
+                printf("Current state = BCC.\n");
+                //Se flag for recebida com sucesso avança para STOP
+                if (buf[index] == FLAG){
+                    cur_state = STOP_RCV;
+                }
+                else 
+                    cur_state = START;
+                break;
 
-                case BCC:
-                    printf("Current state = BCC.\n");
-                    //Se flag for recebida com sucesso avança para STOP
-                    if (buf[index] == FLAG){
-                        printf("Mensagem recebida com sucesso.\n");
-                        cur_state = STOP_RCV;
-                    }
-                    else 
-                        cur_state = START;
-                    break;
-
-                case STOP_RCV:
-                    break;
-                default:
-                    printf("Mensagem não recebida corretamente\n");
-                    break;
-    }
-
-        // Create string to send
-        unsigned char buf_UA[BUF_SIZE] = {0};
-
-        //Mensagem a enviar
-        buf_UA[0] = FLAG;
-        buf_UA[1] = A_R;
-        buf_UA[2] = C_R;
-        // buf_UA[3] = 0xFF;
-        buf_UA[3] = A_R ^ C_R;
-        buf_UA[4] = FLAG; 
-
-        //Envia a mensagem
-
-        int bytes_UA = write(fd, buf_UA, BUF_SIZE);
-        printf("%d bytes written:\n", bytes);
-
-        for (int i = 0; i < 5; i++){
-            printf("0x%02X\n", buf_UA[i]);
+            case STOP_RCV:
+                printf("Current state = STOP! Mensagem recebida com sucesso :)\n");
+                writeUA();
+                STOP = TRUE;
+            break;
+            default:
+                printf("Mensagem não recebida corretamente\n");
+                break;
         }
 
         printf("%d bytes read\n", bytes);
         printf(":%s:%d\n", buf, bytes);
-        if (buf[bytes] == '\0')
-            STOP = TRUE;
     }
 
+    
     // The while() cycle should be changed in order to respect the specifications
     // of the protocol indicated in the Lab guide
     sleep(1);

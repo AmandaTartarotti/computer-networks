@@ -182,8 +182,8 @@ int main(int argc, char *argv[])
 
         while (alarmCount < 4){
             if(alarmEnabled == FALSE){
-                // Set alarm to be triggered in 3s
-                alarm(3);
+                // Set alarm to be triggered in 5s
+                alarm(5);
                 alarmEnabled = TRUE;
             }    
 
