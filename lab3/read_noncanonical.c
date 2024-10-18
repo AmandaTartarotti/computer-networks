@@ -230,8 +230,8 @@ int main(int argc, char *argv[])
         buf_UA[0] = FLAG;
         buf_UA[1] = A_R;
         buf_UA[2] = C_R;
-        buf_UA[3] = 0xFF;
-        // buf_UA[3] = A_R ^ C_R;
+        // buf_UA[3] = 0xFF;
+        buf_UA[3] = A_R ^ C_R;
         buf_UA[4] = FLAG; 
 
         int bytes_UA = write(fd, buf_UA, BUF_SIZE);

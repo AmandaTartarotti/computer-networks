@@ -23,7 +23,7 @@
 #define A_R 0x01
 #define C_R 0x07
 
-#define BUF_SIZE 256  
+#define BUF_SIZE 1 
 
 #define A_S 0x03
 #define A_C 0x03
@@ -114,32 +114,29 @@ int main(int argc, char *argv[])
         // Returns after 5 chars have been input
         int bytes = read(fd, buf, BUF_SIZE);
         buf[bytes] = '\0'; // Set end of string to '\0', so we can printf
-        int index;
+        int index = 0;
 
-        while (cur_state != STOP_RCV){
         
             //Confere sucesso da FLAG e da mensagem com State Machine
             switch(cur_state){
                 case START:
                     printf("Current state = START.\n");
-                    index = 0;
-                    //se a flag for recebida corretamente, avança para FLAG_RCV e proximo byte
+
+                    //se a flag for recebida corretamente, avança para FLAG_RCV
                     if (buf[index] == FLAG){
                         cur_state = FLAG_RCV;
-                        index++;
                     }
                     break;
 
                 case FLAG_RCV:
                     printf("Current state = FLAG_RCV.\n");
-                    //Se A_S for recebido com sucesso avança para A_RCV e proximo byte
+                    //Se A_S for recebido com sucesso avança para A_RCV 
                     if (buf[index] == A_S){
                         cur_state = A_RCV;
-                        index++;
                     }
-                    // se a flag for recebida de novo, avança para proximo byte
+                    // se a flag for recebida de novo, continua aqui
                     else if (buf[index] == FLAG)
-                        index++;
+                        break;
                     // se recebe um valor desconhecido, volta ao START
                     else 
                         cur_state = START;
@@ -147,15 +144,13 @@ int main(int argc, char *argv[])
 
                 case A_RCV:
                     printf("Current state = A_RCV.\n");
-                    //Se flag for recebida, volta para FLAG e avança para próximo byte
+                    //Se flag for recebida, volta para FLAG
                     if (buf[index] == FLAG){
                         cur_state = FLAG_RCV;
-                        index++;
                     }
-                    //Se A_C for recebido com sucesso avança para C_RCV e proximo byte
+                    //Se A_C for recebido com sucesso avança para C_RCV
                     else if (buf[index] == A_C){
                         cur_state = C_RCV;
-                        index++;
                     }
                     else 
                         cur_state = START;
@@ -163,15 +158,13 @@ int main(int argc, char *argv[])
 
                 case C_RCV:
                     printf("Current state = C_RCV.\n");
-                    //Se flag for recebida, volta para FLAG e avança para próximo byte
+                    //Se flag for recebida, volta para FLAG
                     if (buf[index] == FLAG){
                         cur_state = FLAG_RCV;
-                        index++;
                     }
-                    //Se A_C^A_S for recebido com sucesso avança para BCC e proximo byte
+                    //Se A_C^A_S for recebido com sucesso avança para BCC
                     else if (buf[index] == A_C^A_S){
                         cur_state = BCC;
-                        index++;
                     }
                     else 
                         cur_state = START;
@@ -179,11 +172,10 @@ int main(int argc, char *argv[])
 
                 case BCC:
                     printf("Current state = BCC.\n");
-                    //Se flag for recebida com sucesso avança para STOP e para próximo byte
+                    //Se flag for recebida com sucesso avança para STOP
                     if (buf[index] == FLAG){
                         printf("Mensagem recebida com sucesso.\n");
                         cur_state = STOP_RCV;
-                        index++;
                     }
                     else 
                         cur_state = START;
@@ -194,7 +186,6 @@ int main(int argc, char *argv[])
                 default:
                     printf("Mensagem não recebida corretamente\n");
                     break;
-            }
     }
 
         // Create string to send
@@ -204,9 +195,11 @@ int main(int argc, char *argv[])
         buf_UA[0] = FLAG;
         buf_UA[1] = A_R;
         buf_UA[2] = C_R;
-        buf_UA[3] = 0xFF;
-        // buf_UA[3] = A_R ^ C_R;
+        // buf_UA[3] = 0xFF;
+        buf_UA[3] = A_R ^ C_R;
         buf_UA[4] = FLAG; 
+
+        //Envia a mensagem
 
         int bytes_UA = write(fd, buf_UA, BUF_SIZE);
         printf("%d bytes written:\n", bytes);

@@ -37,13 +37,7 @@ int alarmCount = 0;
 
 int fd = -1;
 
-// Alarm function handler
-void alarmHandler(int signal)
-{   
-    alarmEnabled = FALSE;
-    alarmCount++;
-
-    printf("Alarm #%d\n", alarmCount);
+int writeMsg(){
 
     // Create string to send
     unsigned char buf[BUF_SIZE] = {0};
@@ -54,14 +48,17 @@ void alarmHandler(int signal)
     buf[2] = A_S;
     buf[3] = A_S ^ A_S;
     buf[4] = FLAG; 
-    buf[5] = '\n';
+    //buf[5] = '\n';
 
     //writes the msg
     int bytes = write(fd, buf, 5);
+
     printf("%d bytes written\n", bytes);
 
-    // Wait until all bytes have been written to the serial port
-    //sleep(1);
+    return 0;
+}
+
+int readMsg(){
 
     // Recebe e mostra o que o reader retornou
     unsigned char buf_UA[BUF_SIZE + 1] = {0};
@@ -78,9 +75,7 @@ void alarmHandler(int signal)
         
         printf("Mensagem UA recebida com sucesso.\n");
         if (buf_UA[bytes_UA] == '\0') {
-            alarm(0);
-            alarmCount = 4; //condiçao para sair do ciclo
-            printf("Remaining alarms were disable\n");
+            return 0;
         }
     }
     else{
@@ -88,6 +83,27 @@ void alarmHandler(int signal)
         for (int i = 0; i < 5; i++){
             printf("0x%02X\n", buf_UA[i]);
         }
+        return 1;
+    }
+}
+
+// Alarm function handler
+void alarmHandler(int signal)
+{   
+    alarmEnabled = FALSE;
+    alarmCount++;
+
+    printf("Alarm #%d\n", alarmCount);
+
+    writeMsg();
+
+    // Wait until all bytes have been written to the serial port
+    //sleep(1);
+
+    if (!readMsg()){
+        alarm(0);
+        alarmCount = 4; //condiçao para sair do ciclo
+        printf("Remaining alarms were disable\n");
     }
 
 }
@@ -136,8 +152,8 @@ int main(int argc, char *argv[])
 
     // Set input mode (non-canonical, no echo,...)
     newtio.c_lflag = 0;
-    newtio.c_cc[VTIME] = 0; // Inter-character timer unused
-    newtio.c_cc[VMIN] = 5;  // Blocking read until 5 chars received
+    newtio.c_cc[VTIME] = 0.5; // Inter-character timer unused
+    newtio.c_cc[VMIN] = 0;  // Blocking read until 5 chars received
 
     // VTIME e VMIN should be changed in order to protect with a
     // timeout the reception of the following character(s)
@@ -158,18 +174,20 @@ int main(int argc, char *argv[])
 
     printf("New termios structure set\n");
 
-    (void)signal(SIGALRM, alarmHandler);
+    if(writeMsg())
+        printf("Write falhou\n");
+    
+    if(readMsg()){
+        (void)signal(SIGALRM, alarmHandler);
 
-    while (alarmCount < 4){
-
+        while (alarmCount < 4){
             if(alarmEnabled == FALSE){
-
                 // Set alarm to be triggered in 3s
                 alarm(3);
                 alarmEnabled = TRUE;
-
             }    
 
+        }
     }
 
     printf("Ending program\n");
