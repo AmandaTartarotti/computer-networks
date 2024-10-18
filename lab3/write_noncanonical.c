@@ -30,9 +30,6 @@
 #define A_R 0x01
 #define C_R 0x07
 
-int data_size = 3;
-unsigned char data_field[3] = {0x20, 0x21, 0x22}; 
-
 volatile int STOP = FALSE;
 
 int alarmEnabled = FALSE;
@@ -40,7 +37,10 @@ int alarmCount = 0;
 
 int fd = -1;
 
-void writeMsg(){
+int data_size = 3;
+unsigned char data_field[3] = {0x20, 0x21, 0x22}; 
+
+int writeData(){
     // Create string to send
     unsigned char buf[BUF_SIZE] = {0};
 
@@ -50,23 +50,45 @@ void writeMsg(){
     buf[2] = A_S;
     buf[3] = A_S ^ A_S;
 
-    //Vamos add qui o data field
+    //Envia o data field
     int index = 4; 
-    unsigned char error_checker = 0x00;
+    unsigned char bbc2 = 0x00;
     for (int i = 0; i < data_size; i++){
         buf[index + i] = data_field[i];
-        error_checker = error_checker ^ data_field[i];
+        bbc2 = bbc2 ^ data_field[i];
     }
     index += data_size;
 
-    buf[index] = error_checker; // data field checker
+    buf[index] = bbc2;
 
     //Volta o resto do código como antes 
     buf[index + 1] = FLAG; 
-    buf[index + 2] = '\n';
+
     //writes the msg
-    int bytes = write(fd, buf, index + 3);
+    int bytes = write(fd, buf, index + 2);
     printf("%d bytes written\n", bytes);
+
+    return 0;
+}
+
+int writeSet(){
+
+    // Create string to send
+    unsigned char buf[BUF_SIZE] = {0};
+
+    //Mensagem a enviar
+    buf[0] = FLAG;
+    buf[1] = A_S;
+    buf[2] = A_S;
+    buf[3] = A_S ^ A_S;
+    buf[4] = FLAG; 
+
+    //writes the msg
+    int bytes = write(fd, buf, 5);
+
+    printf("%d bytes written\n", bytes);
+
+    return 0;
 }
 
 int readMsg(){
@@ -95,7 +117,6 @@ int readMsg(){
             printf("0x%02X\n", buf_UA[i]);
         }
         return 1;
-
     }
 }
 
@@ -107,7 +128,8 @@ void alarmHandler(int signal)
 
     printf("Alarm #%d\n", alarmCount);
 
-    writeMsg();
+    writeSet();
+
     if (!readMsg()){
         alarm(0);
         alarmCount = 4; //condiçao para sair do ciclo
@@ -160,8 +182,8 @@ int main(int argc, char *argv[])
 
     // Set input mode (non-canonical, no echo,...)
     newtio.c_lflag = 0;
-    newtio.c_cc[VTIME] = 0; // Inter-character timer unused
-    newtio.c_cc[VMIN] = 5;  // Blocking read until 5 chars received
+    newtio.c_cc[VTIME] = 0.5; // Inter-character timer unused
+    newtio.c_cc[VMIN] = 0;  // Blocking read until 5 chars received
 
     // VTIME e VMIN should be changed in order to protect with a
     // timeout the reception of the following character(s)
@@ -182,20 +204,25 @@ int main(int argc, char *argv[])
 
     printf("New termios structure set\n");
 
-    writeMsg();
-
+    if(writeSet())
+        printf("Write set falhou\n");
+    
+    //Tenta ler o UA
     if(readMsg()){
         (void)signal(SIGALRM, alarmHandler);
 
         while (alarmCount < 4){
             if(alarmEnabled == FALSE){
-                // Set alarm to be triggered in 3s
-                alarm(3);
+                // Set alarm to be triggered in 5s
+                alarm(5);
                 alarmEnabled = TRUE;
             }    
 
         }
     }
+
+    if(writeData())
+        printf("Write data falhou\n");
 
     printf("Ending program\n");
 
