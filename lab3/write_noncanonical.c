@@ -26,9 +26,21 @@
 
 #define FLAG 0x7e
 #define A_S 0x03
+#define A_C 0x03
+
 
 #define A_R 0x01
 #define C_R 0x07
+
+typedef enum {
+  START,
+  FLAG_RCV,
+  A_RCV,
+  C_RCV,
+  BCC,
+  DATA,
+  STOP_RCV
+} state_set_msg;
 
 volatile int STOP = FALSE;
 
@@ -74,7 +86,7 @@ int writeData(){
 int writeSet(){
 
     // Create string to send
-    unsigned char buf[BUF_SIZE] = {0};
+    unsigned char buf[5];
 
     //Mensagem a enviar
     buf[0] = FLAG;
@@ -92,7 +104,7 @@ int writeSet(){
 }
 
 int readMsg(){
-
+ 
     // Recebe e mostra o que o reader retornou
     unsigned char buf_UA[BUF_SIZE + 1] = {0};
 
@@ -126,15 +138,7 @@ void alarmHandler(int signal)
     alarmEnabled = FALSE;
     alarmCount++;
 
-    printf("Alarm #%d\n", alarmCount);
-
-    writeSet();
-
-    if (!readMsg()){
-        alarm(0);
-        alarmCount = 4; //condiçao para sair do ciclo
-        printf("Remaining alarms were disable\n");
-    }
+    //printf("Alarm #%d\n", alarmCount);
 
 }
 
@@ -203,26 +207,66 @@ int main(int argc, char *argv[])
     }
 
     printf("New termios structure set\n");
-
-    if(writeSet())
-        printf("Write set falhou\n");
     
-    //Tenta ler o UA
-    if(readMsg()){
-        (void)signal(SIGALRM, alarmHandler);
+    (void)signal(SIGALRM, alarmHandler);
 
-        while (alarmCount < 4){
-            if(alarmEnabled == FALSE){
-                // Set alarm to be triggered in 5s
-                alarm(5);
-                alarmEnabled = TRUE;
-            }    
+    state_set_msg current_state = START;
+    unsigned char byte;
 
+    while (alarmCount < 4 && current_state != STOP_RCV) {
+        printf("Alarm count: %d\n", alarmCount);
+        writeSet();
+        alarm(5);
+        alarmEnabled = TRUE;
+        while(current_state != STOP_RCV && alarmEnabled==TRUE) {
+            if(read(fd, &byte, 1)){
+                printf("buffer -- 0x%02X\n", byte);
+                switch (current_state)
+                {
+                case START:
+                    printf("Current state = START.\n");
+                    if (byte == FLAG) current_state = FLAG_RCV;
+                    break;
+
+                case FLAG_RCV:
+                    printf("Current state = FLAG_RCV.\n");
+                    if (byte == A_R) current_state = A_RCV;
+                    else if (byte == FLAG) break;
+                    else current_state = START;
+                    break;
+
+                case A_RCV:
+                    printf("Current state = A_RCV.\n");
+                    if (byte == FLAG) current_state = FLAG_RCV;
+                    else if (byte == C_R) current_state = C_RCV;
+                    else current_state = START;
+                    break;
+
+                case C_RCV:
+                    printf("Current state = C_RCV.\n");
+                    if (byte == FLAG) current_state = FLAG_RCV;
+                    else if (byte == A_R^C_R) current_state = BCC;
+                    else current_state = START;
+                    break;
+
+                case BCC:
+                    printf("Current state = BCC.\n");
+                    if (byte == FLAG){
+                        current_state = STOP_RCV;
+                        printf("UA RECEBIDO!!");
+                    }
+                    else 
+                        current_state = START;
+                    break;
+                default:
+                    break;
+                }
+            }
         }
     }
 
-    if(writeData())
-        printf("Write data falhou\n");
+    // if(writeData())
+    //     printf("Write data falhou\n");
 
     printf("Ending program\n");
 

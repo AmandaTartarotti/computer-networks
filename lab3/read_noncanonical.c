@@ -24,22 +24,20 @@
 #define A_R 0x01
 #define C_R 0x07
 
-#define BUF_SIZE 1 
+#define BUF_SIZE 1
 
 #define A_S 0x03
 #define A_C 0x03
 
 // Definir maquina de estados
-typedef enum {
-  START,
-  FLAG_RCV,
-  A_RCV,
-  C_RCV,
-  BCC,
-  DATA,
-  BCC2,
-  WRITE_UA,
-  STOP_RCV
+typedef enum
+{
+    START,
+    FLAG_RCV,
+    A_RCV,
+    C_RCV,
+    BCC,
+    STOP_RCV
 } state_set_msg;
 
 state_set_msg cur_state = START;
@@ -50,28 +48,28 @@ int fd = -1;
 
 unsigned char bcc2 = 0x00;
 
-bool data_flag = FALSE;
+void writeUA()
+{
+    // Create string to send
+    unsigned char buf_UA[5] = {0};
 
-void writeUA(){
-        // Create string to send
-        unsigned char buf_UA[5] = {0};
+    // Mensagem a enviar
+    buf_UA[0] = FLAG;
+    buf_UA[1] = A_R;
+    buf_UA[2] = C_R;
+    // buf_UA[3] = 0xFF;
+    buf_UA[3] = A_R ^ C_R;
+    buf_UA[4] = FLAG;
 
-        //Mensagem a enviar
-        buf_UA[0] = FLAG;
-        buf_UA[1] = A_R;
-        buf_UA[2] = C_R;
-        // buf_UA[3] = 0xFF;
-        buf_UA[3] = A_R ^ C_R;
-        buf_UA[4] = FLAG; 
+    // Envia a mensagem
 
-        //Envia a mensagem
+    int bytes_UA = write(fd, buf_UA, 5);
+    printf("%d bytes written:\n", bytes_UA);
 
-        int bytes_UA = write(fd, buf_UA, 5);
-        printf("%d bytes written:\n", bytes_UA);
-
-        for (int i = 0; i < 5; i++){
-            printf("0x%02X\n", buf_UA[i]);
-        }
+    for (int i = 0; i < 5; i++)
+    {
+        printf("0x%02X\n", buf_UA[i]);
+    }
 }
 
 int main(int argc, char *argv[])
@@ -140,135 +138,101 @@ int main(int argc, char *argv[])
     printf("New termios structure set\n");
 
     // Loop for input
-    unsigned char buf[BUF_SIZE + 1] = {0}; // +1: Save space for the final '\0' char
+    unsigned char buf[BUF_SIZE] = {0}; // +1: Save space for the final '\0' char
 
     int counter_bcc = 0;
 
-    while (STOP == FALSE){
+    while (STOP == FALSE)
+    {
         int index = 0;
 
         // Returns after 5 chars have been input
         int bytes = read(fd, buf, BUF_SIZE);
         printf("buffer -- 0x%02X\n", buf[index]);
         buf[bytes] = '\0'; // Set end of string to '\0', so we can printf
-        
-        //Confere sucesso da FLAG e da mensagem com State Machine
-        switch(cur_state){
-            case START:
-                printf("Current state = START.\n");
 
-                //se a flag for recebida corretamente, avança para FLAG_RCV
-                if (buf[index] == FLAG){
-                    cur_state = FLAG_RCV;
-                }
+        // Confere sucesso da FLAG e da mensagem com State Machine
+        switch (cur_state)
+        {
+        case START:
+            printf("Current state = START.\n");
+
+            // se a flag for recebida corretamente, avança para FLAG_RCV
+            if (buf[index] == FLAG)
+            {
+                cur_state = FLAG_RCV;
+            }
+            break;
+
+        case FLAG_RCV:
+            printf("Current state = FLAG_RCV.\n");
+            // Se A_S for recebido com sucesso avança para A_RCV
+            if (buf[index] == A_S)
+            {
+                cur_state = A_RCV;
+            }
+            // se a flag for recebida de novo, continua aqui
+            else if (buf[index] == FLAG)
                 break;
-
-            case FLAG_RCV:
-                printf("Current state = FLAG_RCV.\n");
-                //Se A_S for recebido com sucesso avança para A_RCV 
-                if (buf[index] == A_S){
-                    cur_state = A_RCV;
-                }
-                // se a flag for recebida de novo, continua aqui
-                else if (buf[index] == FLAG)
-                    break;
-                // se recebe um valor desconhecido, volta ao START
-                else 
-                    cur_state = START;
-                break;
-
-            case A_RCV:
-                printf("Current state = A_RCV.\n");
-                //Se flag for recebida, volta para FLAG
-                if (buf[index] == FLAG){
-                    cur_state = FLAG_RCV;
-                }
-                //Se A_C for recebido com sucesso avança para C_RCV
-                else if (buf[index] == A_C){
-                    cur_state = C_RCV;
-                }
-                else 
-                    cur_state = START;
-                break;
-
-            case C_RCV:
-                printf("Current state = C_RCV.\n");
-                //Se flag for recebida, volta para FLAG
-                if (buf[index] == FLAG){
-                    cur_state = FLAG_RCV;
-                }
-                //Se A_C^A_S for recebido com sucesso avança para BCC
-                else if (buf[index] == A_C^A_S){
-                    cur_state = BCC;
-                }
-                else 
-                    cur_state = START;
-                break;
-
-            case BCC:
-                
-                printf("Current state = BCC.\n");
-
-                if (data_flag ){
-                    counter_bcc++;
-                    printf("Data field:\n");
-                    bcc2 = bcc2 ^ buf[index];
-                    printf("0x%02X\n", buf[index]);
-                    cur_state = DATA;
-                }
-                
-                //Se flag for recebida com sucesso avança para STOP
-                else if (buf[index] == FLAG && !data_flag){
-                    data_flag = TRUE;
-                    cur_state = WRITE_UA;
-                }
-                else 
-                    cur_state = START;
-                break;
-
-            case DATA:
-                printf("Current state = DATA.\n");
-                counter_bcc++;
-                bcc2 = bcc2 ^ buf [index];
-
-                if (counter_bcc > 3 && buf[index] == bcc2){
-                    cur_state = BCC2;
-                }
-                //Se flag for recebida com sucesso avança para STOP
-                if (buf[index] == FLAG){
-                    cur_state = STOP_RCV;
-                }
-                else 
-                    cur_state = START;
-                break;
-            case BCC2:
-                printf("Current state = BCC2.\n");
-                //Se flag for recebida com sucesso avança para STOP
-                if (buf[index] == FLAG ){
-                    cur_state = STOP_RCV;
-                }
-                else 
-                    cur_state = START;
-                break;
-            case WRITE_UA:
-                printf("Current state = WRITE_UA.\n");
-                writeUA();
+            // se recebe um valor desconhecido, volta ao START
+            else
                 cur_state = START;
-                break;
-            case STOP_RCV:
-                printf("Current state = STOP! Mensagem recebida com sucesso :)\n");
+            break;
+
+        case A_RCV:
+            printf("Current state = A_RCV.\n");
+            // Se flag for recebida, volta para FLAG
+            if (buf[index] == FLAG)
+            {
+                cur_state = FLAG_RCV;
+            }
+            // Se A_C for recebido com sucesso avança para C_RCV
+            else if (buf[index] == A_C)
+            {
+                cur_state = C_RCV;
+            }
+            else
+                cur_state = START;
+            break;
+
+        case C_RCV:
+            printf("Current state = C_RCV.\n");
+            // Se flag for recebida, volta para FLAG
+            if (buf[index] == FLAG)
+            {
+                cur_state = FLAG_RCV;
+            }
+            // Se A_C^A_S for recebido com sucesso avança para BCC
+            else if (buf[index] == A_C ^ A_S)
+            {
+                cur_state = BCC;
+            }
+            else
+                cur_state = START;
+            break;
+
+        case BCC:
+
+            printf("Current state = BCC.\n");
+
+            // Se flag for recebida com sucesso avança para STOP
+            if (buf[index] == FLAG)
+            {
+                cur_state = STOP_RCV;
+                writeUA();
                 STOP = TRUE;
-                break;
-            default:
-                printf("Mensagem não recebida corretamente\n");
-                break;
+                printf("Current state = STOP! Mensagem recebida com sucesso :)\n");
+            }
+            else
+                cur_state = START;
+            break;
+        
         }
 
-        printf("%d bytes read\n", bytes);
-        printf(":%s:%d\n", buf, bytes);
+        // printf("%d bytes read\n", bytes);
+        // printf(":%s:%d\n", buf, bytes);
     }
 
-    
     // The while() cycle should be changed in order to respect the specifications
     // of the protocol indicated in the Lab guide
     sleep(1);
