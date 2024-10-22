@@ -25,7 +25,7 @@
 #define C_REJ1 0x55
 #define C_DISC 0x0B
 
-#define ESC 0x70
+#define ESC 0x7D
 
 int alarmEnabled = FALSE;
 int alarmCount = 0;
@@ -68,9 +68,11 @@ int llopen(LinkLayer connectionParameters)
     {
         return -1;
     }
+
     state current_state = START;
     totalRetransmitions = connectionParameters.nRetransmissions;
     timeout = connectionParameters.timeout;
+    
     switch (connectionParameters.role)
     {
     case LlTx: //Transmitter
@@ -186,14 +188,13 @@ int llwrite(const unsigned char *buf, int bufSize)
     int framesize = bufSize+6;
     state current_state = START;
     alarmCount = 0;
-    unsigned char cField = 0;
     unsigned char *frame = (unsigned char *) malloc(framesize);
     frame[0] = FLAG;
     frame[1] = A_T;
     frame[2] = frameTx ? 0x80 : 0x00;
     frame[3] = frame[1] ^ frame[2];
 
-    unsigned char BCC2 = buf[0];
+    unsigned char BCC2 = 0x00;
     for (int i = 0; i < bufSize; i++) BCC2 ^= buf[i];
 
     memcpy(frame+4, buf, bufSize);
@@ -201,14 +202,25 @@ int llwrite(const unsigned char *buf, int bufSize)
     int j = 4;
 
     for (int i = 0; i < bufSize; i++) {
-        if(buf[i] == FLAG || buf[i] == ESC) {
-            framesize++;
-            frame = realloc(frame, framesize);
-            frame[j] = ESC;
-            j++;
+        
+        if(buf[i] == FLAG || buf[i] == ESC)
+        {
+                framesize++;
+                char *temp = realloc(frame, framesize);
+                if (temp == NULL) printf("Error during realloc\n");
+                frame = temp;
+                
+                frame[j] = ESC;
+                j++;
+                if (buf[i] == FLAG) frame[j] = 0x5E;
+                else frame[j] = 0x5D;
+                j++;
         }
-        frame[j] = buf[i];
-        j++;
+        else
+        {
+            frame[j] = buf[i];
+            j++;
+        }     
     }
 
     frame[j] = BCC2;
@@ -222,6 +234,7 @@ int llwrite(const unsigned char *buf, int bufSize)
 
             alarm(timeout);
             alarmEnabled = TRUE;
+            unsigned char cField = 0;
 
             while(current_state != STOP_RCV && alarmEnabled==TRUE) {
                 if(readByteSerialPort(&byte)) {
@@ -240,16 +253,21 @@ int llwrite(const unsigned char *buf, int bufSize)
 
                     case A_RCV:
                         if (byte == FLAG) current_state = FLAG_RCV;
-                        else if (byte == C_RR0 || byte == C_RR1 || byte==C_REJ0 || byte==C_REJ1){
-                            current_state = C_RCV;
+                        else if (byte==C_REJ0 || byte==C_REJ1){
+                            alarmEnabled=FALSE;
+                        }
+                        else if (byte == C_RR0 || byte == C_RR1){
                             cField = byte;
+                            if (frameTx == 0) frameTx = 1;
+                            else frameTx = 0;
+                            current_state = C_RCV;
                         }
                         else current_state = START;
                         break;
 
                     case C_RCV:
                         if (byte == FLAG) current_state = FLAG_RCV;
-                        else if (byte == (A_R^C_UA)) current_state = BCC1_OK;
+                        else if (byte == (A_R^cField)) current_state = BCC1_OK;
                         else current_state = START;
                         break;
 
@@ -260,29 +278,23 @@ int llwrite(const unsigned char *buf, int bufSize)
                         else 
                             current_state = START;
                         break;
+                    case STOP_RCV:
+                        printf("Mensagem do reciver foi recebida com sucesso!\n")
+                        break;
                     default:
                         break;
                     }
                 }
             }
 
-            // if(!cField){
-            //     continue;
-            // }
-
-            // elseif(cField == C_REJ0 || cField == C_REJ1){ A execução ja para no momento em que o state é STOP_RCV
-            //     rejected = 1;
-            // }
-
-            if(cField == C_RR0 || cField == C_RR1){
-                free(frame);
-                frameTx = (frameTx+1) % 2;
-                return framesize;
-            }
         }
+
     free(frame);
-    llclose(1);
-    return -1;
+    if(current_state = STOP_RCV) return framesize;
+    else {
+        llclose(1);
+        return -1;
+    }
 }
 
 ////////////////////////////////////////////////
@@ -290,7 +302,30 @@ int llwrite(const unsigned char *buf, int bufSize)
 ////////////////////////////////////////////////
 int llread(unsigned char *packet)
 {
-    // TODO
+    state cur_state = START;
+    while( cur_state != STOP_RCV)
+    {
+        if(readByteSerialPort(&byte))
+        {
+            switch (cur_state) {
+                case START:
+                    if (byte == FLAG) cur_state = FLAG_RCV;
+                    break;
+                case FLAG_RCV:
+                    if (byte == A_T) cur_state = A_RCV;
+                    else if (byte == FLAG) break;
+                    else cur_state = START;
+                    break;  
+                case A_RCV:
+                    break;
+                case C_RCV:
+                    break; 
+                default:
+                    printf("Error during llread\n");
+                    break;
+            }
+        }
+    }
 
     return 0;
 }
