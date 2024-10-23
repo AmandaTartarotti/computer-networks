@@ -223,7 +223,18 @@ int llwrite(const unsigned char *buf, int bufSize)
         }     
     }
 
-    frame[j] = BCC2;
+
+    if (BCC2 == FLAG || BCC2 == ESC) 
+    {
+        framesize++;
+        frame = realloc(frame, framesize);
+        frame[j] = ESC;
+        j++;
+        if (BCC2 == FLAG) frame[j] = 0x5E;
+        else frame[j] = 0x5D;
+        j++;
+    } 
+    else frame[j] = BCC2;
     j++;
     frame[j] = FLAG;
     j++;
@@ -381,6 +392,7 @@ int llread(unsigned char *packet)
                         packet[i] = ESC;
                         i++;
                     }
+                    cur_state = DATA;
                     break;
                 default:
                     printf("Error during llread\n");

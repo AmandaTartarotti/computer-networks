@@ -16,7 +16,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
     linkLayer.timeout = timeout;
     linkLayer.baudRate = baudRate;
     int BUF_SIZE = 5;
-    unsigned char buf[5] = {0x01,0x02,0x03,0x04,0x05};
+    unsigned char buf[5] = {0x01,0x7E,0x03,0x04,0x05};
     switch (linkLayer.role)
     {
     case LlTx:
@@ -40,7 +40,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         for (int i =0; i<8; i++){
             printf("packet -- 0x%02X\n", packet[i]);
         }
-    
+
         break;
     default:
         break;
