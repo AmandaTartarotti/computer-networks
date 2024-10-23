@@ -338,7 +338,7 @@ int llread(unsigned char *packet)
                     else if (byte == FLAG) cur_state = FLAG_RCV;
                     else if (byte == C_DISC) {
                         sendControlFrame(A_R, C_DISC);
-                        return 0; //finish
+                        return 0;
                     }
                     else cur_state = START;
                     break;
@@ -409,7 +409,52 @@ int llread(unsigned char *packet)
 ////////////////////////////////////////////////
 int llclose(int showStatistics)
 {
-    // TODO
+    printf("It is time to say goodbye!\nThis program dealt with a total of %d characters!\n", showStatistics);
+    state cur_state = START;
+    unsigned char byte;
+    alarmCount = 0; 
+
+    while(alarmCount < totalRetransmitions && cur_state != STOP_RCV){
+        sendControlFrame(A_R, C_DISC);
+        //printf("Transmission: %d\n", alarmCount+1);
+
+        alarm(timeout);
+        alarmEnabled = TRUE;
+        while (cur_state != STOP_RCV && alarmEnabled==TRUE){
+            if(readByteSerialPort(&byte)){
+                switch (cur_state) {
+                    case START:
+                        if (byte == FLAG) cur_state = FLAG_RCV;
+                        break;
+                    case FLAG_RCV:
+                        if (byte == A_R) cur_state = A_RCV;
+                        else if (byte == FLAG) break;
+                        else cur_state = START;
+                        break;
+                    case A_RCV:
+                        if (byte == C_DISC) cur_state = C_RCV;
+                        else if (byte == FLAG) cur_state = FLAG_RCV;
+                        else cur_state = START;
+                        break;
+                    case C_RCV:
+                        if (byte == (A_R ^ C_DISC)) cur_state = BCC1_OK;
+                        else if (byte == FLAG) cur_state = FLAG_RCV;
+                        else cur_state = START;
+                        break;
+                    case BCC1_OK:
+                        if (byte == FLAG) {
+                            printf("Close() sucessfull!\n");
+                            sendControlFrame(A_R, C_UA);
+                            cur_state = STOP_RCV;
+                        } else cur_state = START;
+                        break;
+                    default:
+                        printf("Oh no! Error during Close()\n");
+                        break;
+                }
+            }
+        }
+    }
 
     int clstat = closeSerialPort();
     return clstat;
