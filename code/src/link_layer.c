@@ -444,7 +444,7 @@ int llclose(int showStatistics)
                     case BCC1_OK:
                         if (byte == FLAG) {
                             printf("Close() sucessfull!\n");
-                            sendControlFrame(A_R, C_UA);
+                            sendControlFrame(A_T, C_UA);
                             cur_state = STOP_RCV;
                         } else cur_state = START;
                         break;
