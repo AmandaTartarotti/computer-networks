@@ -52,7 +52,7 @@ typedef enum {
   A_RCV,
   C_RCV,
   BCC1_OK,
-  //DATA,
+  DATA,
   //DATA_FOUND_ESC,
   //BCC2_OK,
   STOP_RCV
@@ -89,7 +89,7 @@ int llopen(LinkLayer connectionParameters)
 
             while(current_state != STOP_RCV && alarmEnabled==TRUE) {
                 if(readByteSerialPort(&byte)) {
-                    printf("buffer -- 0x%02X\n", byte);
+                    //printf("buffer -- 0x%02X\n", byte);
                     switch (current_state)
                     {
                     case START:
@@ -133,7 +133,7 @@ int llopen(LinkLayer connectionParameters)
         while (current_state != STOP_RCV) {
 
             if(readByteSerialPort(&byte)) {
-                printf("buffer -- 0x%02X\n", byte);
+                //printf("buffer -- 0x%02X\n", byte);
                 switch (current_state)
                 {
                 case START:
@@ -163,7 +163,7 @@ int llopen(LinkLayer connectionParameters)
                     {
                         current_state = STOP_RCV;
                         sendControlFrame(A_R, C_UA);
-                        printf("Mensagem recebida com sucesso :)\n");
+                        printf("SET RECEBIDO!\n");
                     }
                     else current_state = START;
                     break;
@@ -206,9 +206,7 @@ int llwrite(const unsigned char *buf, int bufSize)
         if(buf[i] == FLAG || buf[i] == ESC)
         {
                 framesize++;
-                char *temp = realloc(frame, framesize);
-                if (temp == NULL) printf("Error during realloc\n");
-                frame = temp;
+                frame = realloc(frame, framesize);
                 
                 frame[j] = ESC;
                 j++;
@@ -279,7 +277,7 @@ int llwrite(const unsigned char *buf, int bufSize)
                             current_state = START;
                         break;
                     case STOP_RCV:
-                        printf("Mensagem do reciver foi recebida com sucesso!\n")
+                        printf("Mensagem do reciver foi recebida com sucesso!\n");
                         break;
                     default:
                         break;
@@ -290,7 +288,7 @@ int llwrite(const unsigned char *buf, int bufSize)
         }
 
     free(frame);
-    if(current_state = STOP_RCV) return framesize;
+    if(current_state == STOP_RCV) return framesize;
     else {
         llclose(1);
         return -1;
@@ -303,10 +301,12 @@ int llwrite(const unsigned char *buf, int bufSize)
 int llread(unsigned char *packet)
 {
     state cur_state = START;
+    int i = 0;
     while( cur_state != STOP_RCV)
     {
         if(readByteSerialPort(&byte))
         {
+            printf("buffer -- 0x%02X\n", byte);
             switch (cur_state) {
                 case START:
                     if (byte == FLAG) cur_state = FLAG_RCV;
@@ -317,9 +317,23 @@ int llread(unsigned char *packet)
                     else cur_state = START;
                     break;  
                 case A_RCV:
+                    if (byte == 0x00 || byte == 0x80){
+                        cur_state = C_RCV;
+                    }
                     break;
                 case C_RCV:
+                    cur_state = DATA;
                     break; 
+                case DATA:
+                    if (byte == FLAG){
+                        cur_state = STOP_RCV;
+                        break;
+                    }
+                    else {
+                        packet[i] = byte;
+                        i++;
+                    }
+                    break;
                 default:
                     printf("Error during llread\n");
                     break;
