@@ -40,7 +40,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         for (int i =0; i<8; i++){
             printf("packet -- 0x%02X\n", packet[i]);
         }
-
+    
         break;
     default:
         break;

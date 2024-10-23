@@ -53,7 +53,7 @@ typedef enum {
   C_RCV,
   BCC1_OK,
   DATA,
-  //DATA_FOUND_ESC,
+  DATA_ESC,
   //BCC2_OK,
   STOP_RCV
 } state;
@@ -195,7 +195,9 @@ int llwrite(const unsigned char *buf, int bufSize)
     frame[3] = frame[1] ^ frame[2];
 
     unsigned char BCC2 = 0x00;
-    for (int i = 0; i < bufSize; i++) BCC2 ^= buf[i];
+    for (int i = 0; i < bufSize; i++) {
+        BCC2 ^= buf[i];
+    }
 
     memcpy(frame+4, buf, bufSize);
 
@@ -236,7 +238,7 @@ int llwrite(const unsigned char *buf, int bufSize)
 
             while(current_state != STOP_RCV && alarmEnabled==TRUE) {
                 if(readByteSerialPort(&byte)) {
-                    printf("buffer -- 0x%02X\n", byte);
+                    //printf("buffer -- 0x%02X\n", byte);
                     switch (current_state)
                     {
                     case START:
@@ -271,13 +273,11 @@ int llwrite(const unsigned char *buf, int bufSize)
 
                     case BCC1_OK:
                         if (byte == FLAG){
+                            printf("Mensagem do reciver foi recebida com sucesso!\n");
                             current_state = STOP_RCV;
                         }
                         else 
                             current_state = START;
-                        break;
-                    case STOP_RCV:
-                        printf("Mensagem do reciver foi recebida com sucesso!\n");
                         break;
                     default:
                         break;
@@ -302,11 +302,14 @@ int llread(unsigned char *packet)
 {
     state cur_state = START;
     int i = 0;
+    unsigned char controlField = 0x00;
+    unsigned char bcc2_checker = 0x00;
+
     while( cur_state != STOP_RCV)
     {
         if(readByteSerialPort(&byte))
         {
-            printf("buffer -- 0x%02X\n", byte);
+            //printf("buffer -- 0x%02X\n", byte);
             switch (cur_state) {
                 case START:
                     if (byte == FLAG) cur_state = FLAG_RCV;
@@ -318,19 +321,64 @@ int llread(unsigned char *packet)
                     break;  
                 case A_RCV:
                     if (byte == 0x00 || byte == 0x80){
+                        controlField = byte;
                         cur_state = C_RCV;
                     }
+                    else if (byte == FLAG) cur_state = FLAG_RCV;
+                    else if (byte == C_DISC) {
+                        sendControlFrame(A_R, C_DISC);
+                        return 0; //finish
+                    }
+                    else cur_state = START;
                     break;
                 case C_RCV:
-                    cur_state = DATA;
+                    if(byte == (A_T^controlField)) cur_state = DATA;
+                    else if(byte == FLAG) cur_state = FLAG_RCV;
+                    else cur_state = START;
                     break; 
                 case DATA:
-                    if (byte == FLAG){
-                        cur_state = STOP_RCV;
-                        break;
+                    if (byte == ESC) cur_state = DATA_ESC;
+                    else if (byte == FLAG){
+                        unsigned char bcc2 = packet[i - 1];
+
+                        bcc2_checker = bcc2_checker ^ bcc2;
+
+                        if(bcc2 == bcc2_checker)
+                        {
+                            if (controlField) {
+                                sendControlFrame(A_R, C_RR0);
+                            }
+                            else {
+                                sendControlFrame(A_R, C_RR1);
+                            }
+                            printf("Mensagem do transmiter foi recebida com sucesso!\n");
+                            cur_state = STOP_RCV;
+                            return (i - 1);
+                        } 
+                        else 
+                        {
+                            printf("Error: bbc2 checker fail :( \n");
+                            if (controlField) sendControlFrame(A_R, C_REJ1);
+                            else sendControlFrame(A_R, C_REJ0);
+                            return -1;
+                        }
+                            
                     }
                     else {
                         packet[i] = byte;
+                        bcc2_checker = bcc2_checker ^ byte;
+                        i++;
+                    }
+                    break;
+                case DATA_ESC:
+                    if(byte == 0x5e) {
+                        bcc2_checker = bcc2_checker ^ FLAG;
+                        packet[i] = FLAG;
+                        i++;
+                    }
+                    else if (byte == 0x5d){
+                        bcc2_checker = bcc2_checker ^ ESC;
+                        packet[i] = ESC;
                         i++;
                     }
                     break;
@@ -341,7 +389,7 @@ int llread(unsigned char *packet)
         }
     }
 
-    return 0;
+    return -1;
 }
 
 ////////////////////////////////////////////////
