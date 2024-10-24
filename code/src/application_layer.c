@@ -12,10 +12,12 @@ unsigned char *controlPacketBuilder (const char* filename, long filesize, int* s
     const int fname_space = strlen(filename);
     
     int fsize_space = 0;
-    while (filesize > 0) 
+
+    int filesize_copy = filesize;
+    while (filesize_copy > 0) 
     {
         fsize_space++;
-        filesize /= 256;
+        filesize_copy /= 256;
     }
 
     *size = 5 + fsize_space + fname_space; // 5 pq é c + T + V + T2 + V2
@@ -26,13 +28,12 @@ unsigned char *controlPacketBuilder (const char* filename, long filesize, int* s
     packet[2] = fsize_space; // V
 
     int index = 3;
-    //-- Aqui é onde ele "quebra" o fszie!! ----
     for (int i = 0; i < fsize_space; i++)
     {
-        packet[index] = (filesize >> (i * 8)) & 0xFF;
+        packet[index] = (filesize >>  8 * i) & 0xFF;
         index++;
     }
-    // ---------------------------------------
+
     packet[index] = 1; // T2
     index++;
     packet[index] = fname_space; // V2
@@ -45,11 +46,11 @@ unsigned char *controlPacketBuilder (const char* filename, long filesize, int* s
     }
 
     //Testando
-    printf("Conteúdo do control packet em bytes: %d\n", *size);
-    printf("Conteúdo:\n");
-    for (unsigned int i = 0; i < *size; i++) {
-        printf("%02x \n", packet[i]);
-    }
+    // printf("Conteúdo do control packet em bytes: %d\n", *size);
+    // printf("Conteúdo:\n");
+    // for (unsigned int i = 0; i < *size; i++) {
+    //     printf("%02x \n", packet[i]);
+    // }
     
     return packet;
 }
@@ -95,7 +96,6 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
 
         if (llwrite(control_packet, control_packet_size) == -1) printf("Llwrite Control Packet error\n");
 
-
         total_char = llwrite(buf, BUF_SIZE);
 
         if(total_char == -1){
@@ -105,9 +105,18 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         llclose(total_char);                
         break;
     case LlRx:
-        unsigned char *packet = (unsigned char *)malloc(8);
+
         llopen(linkLayer);
         printf("finish llopen\n");
+
+        unsigned char *controlpacket = (unsigned char *)malloc(MAX_PAYLOAD_SIZE);
+        if (llread(controlpacket) == -1) printf("Llread Control Packet Error\n");
+
+        unsigned long int file_size = 0;
+        // unsigned char* file_name = controlPacketInfo(); to be implemented
+
+        unsigned char *packet = (unsigned char *)malloc(8);
+
         
         total_char = llread(packet);
 
