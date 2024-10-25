@@ -234,8 +234,10 @@ int llwrite(const unsigned char *buf, int bufSize)
         else frame[j] = 0x5D;
         j++;
     } 
-    else frame[j] = BCC2;
-    j++;
+    else {
+        frame[j] = BCC2;
+        j++;
+    }
     frame[j] = FLAG;
     j++;
 
@@ -348,7 +350,6 @@ int llread(unsigned char *packet)
                     else cur_state = START;
                     break; 
                 case DATA:
-                    printf("data state\n");
                     if (byte == ESC) cur_state = DATA_ESC;
                     else if (byte == FLAG){
                         unsigned char bcc2 = packet[i - 1];
