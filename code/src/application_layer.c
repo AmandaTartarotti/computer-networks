@@ -74,7 +74,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
     linkLayer.timeout = timeout;
     linkLayer.baudRate = baudRate;
     int BUF_SIZE = 5;
-    unsigned char buf[5] = {0x01,0x7E,0x03,0x04,0x05};
+    unsigned char buf[5] = {0x01,0x7E,0x03,0x04,0x05}; //bcc2 igual a esc, bcc2 sai nos dados
     int total_char = 0;
 
     switch (linkLayer.role)

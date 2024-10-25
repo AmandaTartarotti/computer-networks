@@ -348,9 +348,11 @@ int llread(unsigned char *packet)
                     else cur_state = START;
                     break; 
                 case DATA:
+                    printf("data state\n");
                     if (byte == ESC) cur_state = DATA_ESC;
                     else if (byte == FLAG){
                         unsigned char bcc2 = packet[i - 1];
+                        packet[i-1] = 0x00;
 
                         bcc2_checker = bcc2_checker ^ bcc2;
 
