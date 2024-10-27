@@ -6,8 +6,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#define FILESIZE_TYPE 0
+#define FILENAME_TYPE 1
 
-unsigned char *controlPacketBuilder (const char* filename, long filesize, int* size) {
+
+unsigned char *controlPacketBuilder (const char* filename, int filesize, int* size) {
  
     const int fname_space = strlen(filename);
     
@@ -41,8 +44,7 @@ unsigned char *controlPacketBuilder (const char* filename, long filesize, int* s
 
     for (int i = 0; i < fname_space; i++)
     {
-        packet[index] = filename[i];
-        index++;
+        packet[index + i] = filename[i];
     }
 
     //Testando
@@ -55,9 +57,36 @@ unsigned char *controlPacketBuilder (const char* filename, long filesize, int* s
     return packet;
 }
 
-long getFileSize(FILE *fptr) {
+void controlPacketInfo(unsigned char* packet, int control_packet_size, int *fileSize, char *filename){
+
+    int index = 2;
+
+    if(packet[1] == FILESIZE_TYPE){
+        int fsize_space = packet[2]; 
+
+        int file_calculator = 0;
+        for (int i = (fsize_space + 2); i >= 3 ; i--){
+            file_calculator = file_calculator * 256 + (int)packet[i];
+        }
+        fileSize = file_calculator;
+        // printf("fileSize -- %d\n", fileSize);
+        index += fsize_space + 1;
+    } else printf("Ops! Could not find fileSize Type\n");
+
+    if(packet[index] == FILENAME_TYPE){
+        index++;
+        int fname_space = packet[index];
+
+        index++;
+        for(int i = 0; i < fname_space; i++)
+            filename[i] = packet[index + i]; 
+        // printf("fileName -- %s\n",filename);
+    } else printf("Ops! Could not find fileName Type\n");
+}
+
+int getFileSize(FILE *fptr) {
     fseek(fptr, 0, SEEK_END);
-    long size = ftell(fptr);
+    int size = ftell(fptr);
     fseek(fptr, 0, SEEK_SET);
 
     //printf("size -- %lu", size);
@@ -90,55 +119,55 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         fptr = fopen(filename, "rb");
         if (fptr == NULL) printf("File not found\n");
 
-        long filesize = getFileSize(fptr);
+        int filesize = getFileSize(fptr);
         if (filesize == 0) printf("Empyt file found\n");
 
-        int control_packet_size = 0;
-        unsigned char *control_packet = controlPacketBuilder(filename, filesize, &control_packet_size);
+        int control_packetSize = 0;
+        unsigned char *control_packet = controlPacketBuilder(filename, filesize, &control_packetSize);
 
-        if (llwrite(control_packet, control_packet_size) == -1) printf("Llwrite Control Packet error\n"); //sends control packet
+        if (llwrite(control_packet, control_packetSize) == -1) printf("Llwrite Control Packet error\n"); //sends control packet
 
-        unsigned char sequence_number = 0;
-        unsigned char* fileContent = (unsigned char*)malloc(sizeof(unsigned char) * filesize);
-        fread(fileContent, sizeof(unsigned char), filesize, fptr); //Passa o que tem dentro da file para a variavel fileContent
-        long int bytesLeft = filesize;
+        // unsigned char sequence_number = 0;
+        // unsigned char* fileContent = (unsigned char*)malloc(sizeof(unsigned char) * filesize);
+        // fread(fileContent, sizeof(unsigned char), filesize, fptr); //Passa o que tem dentro da file para a variavel fileContent
+        // long int bytesLeft = filesize;
 
-        while(bytesLeft >= 0){
+        // while(bytesLeft >= 0){
 
-            int datasize = 0;
-            if(bytesLeft > (long int) MAX_PAYLOAD_SIZE){
-                datasize = MAX_PAYLOAD_SIZE;
-            }
-            else {
-                datasize = bytesLeft;
-            }
-            unsigned char* data = (unsigned char*) malloc(datasize);
-            memcpy(data, fileContent, datasize);
-            int packetsize;
-            unsigned char* packet = dataPacketBuilder(sequence_number, data, datasize, &packetsize);
+        //     int datasize = 0;
+        //     if(bytesLeft > (long int) MAX_PAYLOAD_SIZE){
+        //         datasize = MAX_PAYLOAD_SIZE;
+        //     }
+        //     else {
+        //         datasize = bytesLeft;
+        //     }
+        //     unsigned char* data = (unsigned char*) malloc(datasize);
+        //     memcpy(data, fileContent, datasize);
+        //     int packetsize;
+        //     unsigned char* packet = dataPacketBuilder(sequence_number, data, datasize, &packetsize);
 
-            if(llwrite(packet,packetsize) == -1){
-                printf("Error in data packets\n");
-                exit(-1);
-            }
+        //     if(llwrite(packet,packetsize) == -1){
+        //         printf("Error in data packets\n");
+        //         exit(-1);
+        //     }
 
 
-            bytesLeft -= (long int) MAX_PAYLOAD_SIZE;
-            fileContent += datasize;
-            sequence_number = (sequence_number + 1) % 255;
-        }
-
-        unsigned char *controlPacketEnd = getControlPacket(3, filename, filesize, &control_packet_size);
-        if(llwrite(controlPacketEnd, control_packet_size) == -1) { 
-            printf("Exit: error in end packet\n");
-            exit(-1);
-        }
-
-        // total_char = llwrite(buf, BUF_SIZE);
-
-        // if(total_char == -1){
-        //     printf("Llwrite error\n");
+        //     bytesLeft -= (long int) MAX_PAYLOAD_SIZE;
+        //     fileContent += datasize;
+        //     sequence_number = (sequence_number + 1) % 255;
         // }
+
+        // unsigned char *controlPacketEnd = getControlPacket(3, filename, filesize, &control_packet_size);
+        // if(llwrite(controlPacketEnd, control_packet_size) == -1) { 
+        //     printf("Exit: error in end packet\n");
+        //     exit(-1);
+        // }
+
+        total_char = llwrite(buf, BUF_SIZE);
+
+        if(total_char == -1){
+            printf("Llwrite error\n");
+        }
 
         llclose(total_char);                
         break;
@@ -148,47 +177,45 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
     case LlRx:
 
         unsigned char *packet = (unsigned char *)malloc(MAX_PAYLOAD_SIZE);
-        int packetSize = -1;
+        int control_packet_size;
 
-        while (packetSize = llread(packet) <0); //Lê o packet de controle
-        unsigned long int rcvFileSize = 0;
-        unsigned char* name = controlPacketInfo(packet, packetSize, &rcvFileSize); //faz parse das informacoes do packet de controle
+        control_packet_size = llread(packet); 
+        int fileSize = 0;
+        unsigned char fileName = "";
+        controlPacketInfo(packet, control_packet_size, &fileSize, &fileName);
+        
+        // FILE* rcvFile = fopen((char *) name, "wb+");
 
-        FILE* rcvFile = fopen((char *) name, "wb+");
+        // while(TRUE){
+        //     while((packetSize = llread(packet)) < 0){ //LÊ os packets de dados
+        //         if(packetSize == 0) break;
+        //         else if(packet[0] != 3){
+        //             unsigned char *buf = (unsigned char*)malloc(packetSize);
+        //             getDataPacket(packet, packetSize, buf); //faz parse das informacoes de dados
+        //             fwrite(buf, sizeof(unsigned char), packetSize-4, rcvFile);
+        //             free(buf);
+        //         }
+        //         else continue;
+        //     }
+        // }
 
-        while(TRUE){
-            while((packetSize = llread(packet)) < 0){ //LÊ os packets de dados
-                if(packetSize == 0) break;
-                else if(packet[0] != 3){
-                    unsigned char *buf = (unsigned char*)malloc(packetSize);
-                    getDataPacket(packet, packetSize, buf); //faz parse das informacoes de dados
-                    fwrite(buf, sizeof(unsigned char), packetSize-4, rcvFile);
-                    free(buf);
-                }
-                else continue;
-            }
+        // fclose(rcvFile);
+        // break;
+
+        int file_size = 0;
+        unsigned char *packet_dummy = (unsigned char *)malloc(8);
+
+        total_char = llread(packet_dummy);
+
+        if(total_char == -1){
+            printf("Llread error\n");
         }
 
-        fclose(rcvFile);
-        break;
+        for (int i =0; i<8; i++){
+            printf("packet -- 0x%02X\n", packet_dummy[i]);
+        }
 
-        // unsigned long int file_size = 0;
-        // // unsigned char* file_name = controlPacketInfo(); to be implemented
-
-        // unsigned char *packet = (unsigned char *)malloc(8);
-
-        
-        // total_char = llread(packet);
-
-        // if(total_char == -1){
-        //     printf("Llread error\n");
-        // }
-
-        // for (int i =0; i<8; i++){
-        //     printf("packet -- 0x%02X\n", packet[i]);
-        // }
-
-        // llclose(total_char);
+        llclose(total_char);
 
         break;
 
