@@ -224,19 +224,21 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         // break;
 
         int file_size = 0;
-        unsigned char *packet_dummy = (unsigned char *)malloc(8);
-        packetsize = llread(packet_dummy);
-        
-        unsigned char *buf = (unsigned char *)malloc(packetsize);
+        unsigned char *packet_dummy = (unsigned char *)malloc(MAX_PAYLOAD_SIZE);
+        int ps = llread(packet_dummy);
 
-        dataPacketInfo(packet_dummy, packetsize, buf);
+        printf("%d\n", ps);
+
+        unsigned char buf[10];
+
+        dataPacketInfo(packet_dummy, ps, buf);
 
 
-        if(packetsize == -1){
+        if(ps == -1){
             printf("Llread error\n");
         }
 
-        for (int i =0; i<packetsize; i++){
+        for (int i =0; i<ps; i++){
             printf("data packet -- 0x%02X\n", buf[i]);
         }
 
