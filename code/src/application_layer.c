@@ -84,6 +84,27 @@ void controlPacketInfo(unsigned char* packet, int control_packet_size, int *file
     } else printf("Ops! Could not find fileName Type\n");
 }
 
+unsigned char * dataPacketBuilder(unsigned char sequence_number, unsigned char *data, int datasize, int *packetsize){
+    
+    *packetsize = 4 + datasize;
+
+    unsigned char* packet = (unsigned char*)malloc(*packetsize);
+
+    packet[0] = 2;
+    packet[1] = sequence_number;
+    packet[2] = datasize / 256;
+    packet[3] = datasize % 256;
+    memcpy(packet+4, data, datasize);
+
+    return packet;
+}
+
+void dataPacketInfo(unsigned char *packet, int packetsize, unsigned char *buf) {
+    if(packet[0] != 2) exit(1);
+    memcpy(buf, packet+4, packetsize-4);
+    //buffer += packetsize + 4;
+}
+
 int getFileSize(FILE *fptr) {
     fseek(fptr, 0, SEEK_END);
     int size = ftell(fptr);
@@ -127,7 +148,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
 
         if (llwrite(control_packet, control_packetSize) == -1) printf("Llwrite Control Packet error\n"); //sends control packet
 
-        // unsigned char sequence_number = 0;
+        unsigned char sequence_number = 0;
         // unsigned char* fileContent = (unsigned char*)malloc(sizeof(unsigned char) * filesize);
         // fread(fileContent, sizeof(unsigned char), filesize, fptr); //Passa o que tem dentro da file para a variavel fileContent
         // long int bytesLeft = filesize;
@@ -162,8 +183,9 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         //     printf("Exit: error in end packet\n");
         //     exit(-1);
         // }
-
-        total_char = llwrite(buf, BUF_SIZE);
+        int packetsize;
+        unsigned char* packet = dataPacketBuilder(sequence_number, buf, MAX_PAYLOAD_SIZE, &packetsize);
+        total_char = llwrite(packet, packetsize);
 
         if(total_char == -1){
             printf("Llwrite error\n");
@@ -176,14 +198,13 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
 
     case LlRx:
 
-        unsigned char *packet = (unsigned char *)malloc(MAX_PAYLOAD_SIZE);
+        unsigned char *packet_control = (unsigned char *)malloc(MAX_PAYLOAD_SIZE);
         int control_packet_size;
 
-        control_packet_size = llread(packet); 
+        control_packet_size = llread(packet_control); 
         int fileSize = 0;
         unsigned char fileName = "";
-        controlPacketInfo(packet, control_packet_size, &fileSize, &fileName);
-        
+        controlPacketInfo(packet_control, control_packet_size, &fileSize, &fileName);
         // FILE* rcvFile = fopen((char *) name, "wb+");
 
         // while(TRUE){
@@ -192,7 +213,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         //         else if(packet[0] != 3){
         //             unsigned char *buf = (unsigned char*)malloc(packetSize);
         //             getDataPacket(packet, packetSize, buf); //faz parse das informacoes de dados
-        //             fwrite(buf, sizeof(unsigned char), packetSize-4, rcvFile);
+        //             fwrite(buf, sizeof(unsigned char), packetSize-4, rcvFile); //escreve os dados na file
         //             free(buf);
         //         }
         //         else continue;
@@ -204,15 +225,19 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
 
         int file_size = 0;
         unsigned char *packet_dummy = (unsigned char *)malloc(8);
+        packetsize = llread(packet_dummy);
+        
+        unsigned char *buf = (unsigned char *)malloc(packetsize);
 
-        total_char = llread(packet_dummy);
+        dataPacketInfo(packet_dummy, packetsize, buf);
 
-        if(total_char == -1){
+
+        if(packetsize == -1){
             printf("Llread error\n");
         }
 
-        for (int i =0; i<8; i++){
-            printf("packet -- 0x%02X\n", packet_dummy[i]);
+        for (int i =0; i<packetsize; i++){
+            printf("data packet -- 0x%02X\n", buf[i]);
         }
 
         llclose(total_char);
