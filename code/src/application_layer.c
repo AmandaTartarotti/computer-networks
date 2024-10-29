@@ -9,11 +9,18 @@
 #define FILESIZE_TYPE 0
 #define FILENAME_TYPE 1
 
-
+/**
+ * Builds the Control Packet 
+ * @param c control field (values: 1 – start; 3 – end)
+ * @param filename name of the file to be transmitted.
+ * @param filesize size of the file to be transmitted
+ * @param size size of the generated packet
+ * @return control packet data 
+ */
 unsigned char *controlPacketBuilder (int c, const char* filename, int filesize, int* size) {
- 
-    const int fname_space = strlen(filename);
     
+    //Calculates the space needed to store the filename and filezise
+    const int fname_space = strlen(filename);
     int fsize_space = 0;
 
     int filesize_copy = filesize;
@@ -23,67 +30,61 @@ unsigned char *controlPacketBuilder (int c, const char* filename, int filesize, 
         filesize_copy /= 256;
     }
 
-    *size = 5 + fsize_space + fname_space; // 5 pq é c + T + V + T2 + V2
+    // Dynamically allocates the packet space
+    *size = 5 + fsize_space + fname_space;
     unsigned char *packet = (unsigned char*)malloc(*size);
+    
+    //Stores the data inside the packet
+    int index = 0;
+    packet[index++] = c;
+    packet[index++] = 0; 
+    packet[index++] = fsize_space;
 
-    packet[0] = c; //START
-    packet[1] = 0; // T 
-    packet[2] = fsize_space; // V
-
-    int index = 3;
     for (int i = 0; i < fsize_space; i++)
-    {
-        packet[index] = (filesize >>  8 * i) & 0xFF;
-        index++;
-    }
+        packet[index++] = (filesize >>  8 * i) & 0xFF;
 
-    packet[index] = 1; // T2
-    index++;
-    packet[index] = fname_space; // V2
-    index++;
+    packet[index++] = 1;
+    packet[index++] = fname_space;
+
 
     for (int i = 0; i < fname_space; i++)
-    {
         packet[index + i] = filename[i];
-    }
-
-    //Testando
-    // printf("Conteúdo do control packet em bytes: %d\n", *size);
-    // printf("Conteúdo:\n");
-    // for (unsigned int i = 0; i < *size; i++) {
-    //     printf("%02x \n", packet[i]);
-    // }
     
     return packet;
 }
 
+/**
+ * Get the Information from the given Control Packet
+ * @param packet the Control Packet to be parsed
+ * @param control_packet_size size of the Control Packet to be parsed
+ * @param filename string where we will store the found file
+ * @return the size of the found file
+ */
 int controlPacketInfo(unsigned char* packet, int control_packet_size, char *filename){
 
-    int index = 2;
-    int file_calculator = 0;
+    int index = 1;
+    int file_size = 0;
 
-    if(packet[1] == FILESIZE_TYPE){
-        int fsize_space = packet[2]; 
+    //Gets the file's size
+    if(packet[++] == FILESIZE_TYPE){
+        int fsize_space = packet[++]; 
         
         for (int i = (fsize_space + 2); i >= 3 ; i--){
-            file_calculator = file_calculator * 256 + (int)packet[i];
+            file_size = file_size * 256 + (int)packet[i];
         }
         index += fsize_space + 1;
     } else printf("Ops! Could not find fileSize Type\n");
 
-    if(packet[index] == FILENAME_TYPE){
-        index++;
-        int fname_space = packet[index];
+    //Gets the file's name
+    if(packet[index++] == FILENAME_TYPE){
+        int fname_space = packet[index++];
 
-        index++;
         for(int i = 0; i < fname_space; i++)
             filename[i] = packet[index + i]; 
     } else printf("Ops! Could not find fileName Type\n");
 
-    // printf("final fileSize during parsing ---%d\n", file_calculator);
-    // printf("final fileName during parsing -- %s\n",filename);
 
-    return file_calculator;
+    return file_size;
 }
 
 unsigned char * dataPacketBuilder(unsigned char sequence_number, unsigned char *data, int datasize, int *packetsize){
