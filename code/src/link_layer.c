@@ -277,6 +277,8 @@ int llwrite(const unsigned char *buf, int bufSize)
                     case A_RCV:
                         if (byte == FLAG) current_state = FLAG_RCV;
                         else if (byte==C_REJ0 || byte==C_REJ1){
+                            printf("Looks like we had problems, recived rejection byte 0x%02X\n", byte);
+                            current_state = START;
                             alarmEnabled=FALSE;
                         }
                         else if (byte == C_RR0 || byte == C_RR1){

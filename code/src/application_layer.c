@@ -227,13 +227,16 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         {
             packetSize = llread(data_packet);
             printf("packetSize -- %d\n", packetSize);
+            
             if (data_packet[0] != 3 & packetSize != -1)
             {
                 for (int i = 0; i < packetSize - 4; i++)
                 {
-                    if (i < 10){
-                        printf("buffer -- 0x%02X\n", data_packet[4 + i]);
-                    }
+                    
+                    // if (i < 5){
+                    //     printf("data_packet -- 0x%02X\n", data_packet[4 + i]);
+                    // }
+
                     file_buf[bytes_read++] = data_packet[4 + i];
                 }
                 
