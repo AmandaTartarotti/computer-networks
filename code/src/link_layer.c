@@ -54,7 +54,6 @@ typedef enum {
   BCC1_OK,
   DATA,
   DATA_ESC,
-  //BCC2_OK,
   STOP_RCV
 } state;
 

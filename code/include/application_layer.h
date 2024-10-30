@@ -4,6 +4,10 @@
 #ifndef _APPLICATION_LAYER_H_
 #define _APPLICATION_LAYER_H_
 
+//Student's definitions
+#define FILESIZE_TYPE 0
+#define FILENAME_TYPE 1
+
 // Application layer main function.
 // Arguments:
 //   serialPort: Serial port name (e.g., /dev/ttyS0).
