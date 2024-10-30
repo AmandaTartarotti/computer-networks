@@ -68,11 +68,11 @@ int controlPacketInfo(unsigned char* packet, int control_packet_size, char *file
     //Gets the file's size
     if(packet[index++] == FILESIZE_TYPE){
         int fsize_space = packet[index++]; 
-        
         for (int i = (fsize_space + 2); i >= 3 ; i--){
             file_size = file_size * 256 + (int)packet[i];
         }
-        index += fsize_space + 1;
+        index += fsize_space;
+
     } else printf("Ops! Could not find fileSize Type\n");
 
     //Gets the file's name
@@ -129,24 +129,29 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
     unsigned char buf[5] = {0x01,0x7E,0x03,0x04,0x05}; //bcc2 igual a esc, bcc2 sai nos dados
     int total_char = 0;
 
-    if(llopen(linkLayer)<0){
-        perror("Erro no open\n");
+    if(llopen(linkLayer) < 0){
+        perror("Erro during llopen!\n");
         exit(-1);
     }
+
+    FILE* fptr;
+    int control_packetSize = 0;
+    int control_packet_size;
+    unsigned char* control_packet;
+    unsigned char* packet_control;
 
     switch (linkLayer.role)
     {
     case LlTx:
 
-        FILE* fptr;
+
         fptr = fopen(filename, "rb");
         if (fptr == NULL) printf("File not found\n");
 
         int filesize = getFileSize(fptr);
         if (filesize == 0) printf("Empyt file found\n");
 
-        int control_packetSize = 0;
-        unsigned char *control_packet = controlPacketBuilder(1, filename, filesize, &control_packetSize);
+        control_packet = controlPacketBuilder(1, filename, filesize, &control_packetSize);
 
         if (llwrite(control_packet, control_packetSize) == -1) printf("Llwrite Control Packet error\n"); //sends control packet
 
@@ -204,8 +209,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
 
     case LlRx:
 
-        unsigned char *packet_control = (unsigned char *)malloc(MAX_PAYLOAD_SIZE);
-        int control_packet_size;
+        packet_control = (unsigned char *)malloc(MAX_PAYLOAD_SIZE);
 
         control_packet_size = llread(packet_control); 
         int fileSize = 0;
@@ -222,10 +226,14 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         while (bytes_read < fileSize)
         {
             packetSize = llread(data_packet);
-            if (data_packet[0] != 3)
+            printf("packetSize -- %d\n", packetSize);
+            if (data_packet[0] != 3 & packetSize != -1)
             {
                 for (int i = 0; i < packetSize - 4; i++)
                 {
+                    if (i < 10){
+                        printf("buffer -- 0x%02X\n", data_packet[4 + i]);
+                    }
                     file_buf[bytes_read++] = data_packet[4 + i];
                 }
                 

@@ -124,7 +124,7 @@ int llopen(LinkLayer connectionParameters)
                     case BCC1_OK:
                         if (byte == FLAG){
                             current_state = STOP_RCV;
-                            printf("UA RECEBIDO!!\n");
+                            printf("UA recived and llopen() done. Keep going! \n");
                         }
                         else 
                             current_state = START;
@@ -171,7 +171,7 @@ int llopen(LinkLayer connectionParameters)
                         current_state = STOP_RCV;
                         sendControlFrame(A_R, C_UA);
                         statistics.NumberFramesSent++;
-                        printf("SET RECEBIDO!\n");
+                        printf("SET recived and llopen() done. Keep going! \n");
                     }
                     else current_state = START;
                     break;
@@ -185,6 +185,7 @@ int llopen(LinkLayer connectionParameters)
         break;
     }
 
+    if(current_state != STOP_RCV) return -1;
     return 1;
 }
 
@@ -298,8 +299,10 @@ int llwrite(const unsigned char *buf, int bufSize)
                             printf("Mensagem do reciver foi recebida com sucesso!\n");
                             current_state = STOP_RCV;
                         }
-                        else 
+                        else {
                             current_state = START;
+                        }
+                            
                         break;
                     default:
                         break;
