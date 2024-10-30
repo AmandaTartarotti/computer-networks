@@ -58,6 +58,13 @@ typedef enum {
   STOP_RCV
 } state;
 
+struct Statistics {
+    int NumberFramesSent;
+    int numberRetransmissions;
+    int numberTimeouts;
+} statistics = {0,0,0};
+
+
 ////////////////////////////////////////////////
 // LLOPEN
 ////////////////////////////////////////////////
@@ -83,7 +90,7 @@ int llopen(LinkLayer connectionParameters)
         while (alarmCount < totalRetransmitions && current_state != STOP_RCV) {
             sendControlFrame(A_T, C_SET);
             printf("Transmission: %d\n", alarmCount+1);
-
+            statistics.NumberFramesSent++;
             alarm(timeout);
             alarmEnabled = TRUE;
 
@@ -163,6 +170,7 @@ int llopen(LinkLayer connectionParameters)
                     {
                         current_state = STOP_RCV;
                         sendControlFrame(A_R, C_UA);
+                        statistics.NumberFramesSent++;
                         printf("SET RECEBIDO!\n");
                     }
                     else current_state = START;
@@ -243,6 +251,7 @@ int llwrite(const unsigned char *buf, int bufSize)
 
     while (alarmCount < totalRetransmitions && current_state != STOP_RCV) {
             writeBytesSerialPort(frame, j);
+            statistics.NumberFramesSent++;
             printf("Transmission: %d\n", alarmCount+1);
 
             alarm(timeout);
@@ -340,6 +349,7 @@ int llread(unsigned char *packet)
                     else if (byte == FLAG) cur_state = FLAG_RCV;
                     else if (byte == C_DISC) {
                         sendControlFrame(A_R, C_DISC);
+                        statistics.NumberFramesSent++;
                         return 0;
                     }
                     else cur_state = START;
@@ -361,9 +371,11 @@ int llread(unsigned char *packet)
                         {
                             if (controlField) {
                                 sendControlFrame(A_R, C_RR0);
+                                statistics.NumberFramesSent++;
                             }
                             else {
                                 sendControlFrame(A_R, C_RR1);
+                                statistics.NumberFramesSent++;
                             }
                             printf("Mensagem do transmiter foi recebida com sucesso!\n");
                             cur_state = STOP_RCV;
@@ -372,8 +384,14 @@ int llread(unsigned char *packet)
                         else 
                         {
                             printf("Error: bbc2 checker fail :( \n");
-                            if (controlField) sendControlFrame(A_R, C_REJ1);
-                            else sendControlFrame(A_R, C_REJ0);
+                            if (controlField){
+                                sendControlFrame(A_R, C_REJ1);
+                                statistics.NumberFramesSent++;
+                            }
+                            else{
+                                sendControlFrame(A_R, C_REJ0);
+                                statistics.NumberFramesSent++;
+                            }
                             return -1;
                         }
                             
@@ -412,7 +430,6 @@ int llread(unsigned char *packet)
 ////////////////////////////////////////////////
 int llclose(int showStatistics)
 {
-    printf("It is time to say goodbye!\nThis program dealt with a total of %d characters!\n", showStatistics);
     state cur_state = START;
     unsigned char byte;
     alarmCount = 0; 
@@ -457,6 +474,11 @@ int llclose(int showStatistics)
                 }
             }
         }
+    }
+
+    if(showStatistics == 1){
+        printf("=======STATISTICS=======\n");
+        printf("Number of frames sent: %d\n", statistics.NumberFramesSent);
     }
 
     int clstat = closeSerialPort();

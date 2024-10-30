@@ -66,8 +66,8 @@ int controlPacketInfo(unsigned char* packet, int control_packet_size, char *file
     int file_size = 0;
 
     //Gets the file's size
-    if(packet[++] == FILESIZE_TYPE){
-        int fsize_space = packet[++]; 
+    if(packet[index++] == FILESIZE_TYPE){
+        int fsize_space = packet[index++]; 
         
         for (int i = (fsize_space + 2); i >= 3 ; i--){
             file_size = file_size * 256 + (int)packet[i];
@@ -198,7 +198,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         //     printf("Llwrite error\n");
         // }
 
-        llclose(total_char);           
+        llclose(1);           
         break;
 
 
@@ -245,7 +245,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         fclose(rcvFile);
         free(file_buf);
 
-        llclose(9); // numero qualquer por hora
+        llclose(1); // numero qualquer por hora
 
         break;
 
