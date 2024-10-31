@@ -123,7 +123,7 @@ int getFileSize(FILE *fptr) {
 void applicationLayer(const char *serialPort, const char *role, int baudRate,
                       int nTries, int timeout, const char *filename)
 {
-
+    printf("\n");
     // Defines the linkLayer according to the given parameters
     LinkLayer linkLayer;
     strcpy(linkLayer.serialPort, serialPort);
@@ -171,17 +171,19 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             printf("Llwrite Control Packet error\n");
             exit(-1);
         }
+        printf("Control packet sent!\n");
 
         fileContent = (unsigned char*)malloc(sizeof(unsigned char) * file_size);
         if (fileContent == NULL) printf("Erro ao alocar memória.\n");
-        fread(fileContent, sizeof(unsigned char), file_size, fptr); 
+        fread(fileContent, sizeof(unsigned char), file_size, fptr);
+        printf("\n");
         
         //While still has bytes left, sends it through a data packet
         bytesLeft = file_size;
         while(bytesLeft >= 0){
 
             datasize = 0;
-            printf("Data Packet number ------------- %u\n", sequence_number);
+            printf("\nData Packet number ------------- %u\n", sequence_number);
             printf("BytesLeft to be sent ----------- %d\n", bytesLeft);
             if(bytesLeft > MAX_PAYLOAD_SIZE){
                 datasize = MAX_PAYLOAD_SIZE;
@@ -202,7 +204,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             sequence_number = (sequence_number + 1) % 255;
         }
 
-        printf(">>>>> Finish to transmit data file <<<<<<\n");
+        printf("\n>>>>> Finish to transmit data file <<<<<<\n\n");
 
         //Sends the Control Packet - End
         controlPacketEnd = controlPacketBuilder(3, filename, file_size, &control_packet_size);

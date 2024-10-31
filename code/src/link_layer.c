@@ -125,7 +125,7 @@ int llopen(LinkLayer connectionParameters)
                         if (byte == FLAG)
                         {
                             current_state = STOP_RCV_open;
-                            printf("UA recived\n");
+                            printf("UA recived\n\n");
                         }
                         else
                             current_state = START_open;
@@ -562,7 +562,7 @@ int llclose(int showStatistics)
         statistics.executionTime = ((double)(end - start)) / CLOCKS_PER_SEC;
         if (showStatistics == 1 && cur_state == STOP_RCV)
         {
-            printf("=======STATISTICS=======\n");
+            printf("\n=======STATISTICS=======\n");
             printf("Number of frames sent: %d\n", statistics.NumberFramesSent);
             printf("Number of retransmissions: %d\n", statistics.numberRetransmissions);
             printf("Execution time: %.2f\n", statistics.executionTime);
