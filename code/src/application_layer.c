@@ -139,47 +139,58 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
     }
 
     // Definition of usefull variables 
-    int total_char = 0;
-    FILE* fptr;
-    int control_packet_size = 0;
+    FILE* fptr; 
+    unsigned char* data;
+    unsigned char* packet;
+    unsigned char *controlPacketEnd;
     unsigned char* control_packet;
+    unsigned char* fileContent;
+    unsigned char* fileBuf;
+    unsigned char sequence_number = 0;
+    int bytesLeft = 0;
+    int bytes_read = 0;
+    int file_size = 0;
+    int datasize = 0;
+    int packetsize = 0;
+    int control_packet_size = 0;
+
 
     switch (linkLayer.role)
     {
     case LlTx:
 
+        //Opens the given file and get the file's info
         fptr = fopen(filename, "rb");
         if (fptr == NULL) printf("File not found\n");
+        file_size = getFileSize(fptr);
+        if (file_size == 0) printf("Empyt file found\n");
 
-        int filesize = getFileSize(fptr);
-        if (filesize == 0) printf("Empyt file found\n");
-
-        control_packet = controlPacketBuilder(1, filename, filesize, &control_packet_size);
-
+        //Builds the Control Packet with the file's info and sends it
+        control_packet = controlPacketBuilder(1, filename, file_size, &control_packet_size);
         if (llwrite(control_packet, control_packet_size) == -1) {
             printf("Llwrite Control Packet error\n");
             exit(-1);
         }
 
-        unsigned char sequence_number = 0;
-        unsigned char* fileContent = (unsigned char*)malloc(sizeof(unsigned char) * filesize);
-        fread(fileContent, sizeof(unsigned char), filesize, fptr); 
-        int bytesLeft = filesize;
-
+        fileContent = (unsigned char*)malloc(sizeof(unsigned char) * file_size);
+        if (fileContent == NULL) printf("Erro ao alocar memória.\n");
+        fread(fileContent, sizeof(unsigned char), file_size, fptr); 
+        
+        //While still has bytes left, sends it through a data packet
+        bytesLeft = file_size;
         while(bytesLeft >= 0){
 
-            int datasize = 0;
-            printf("bytesLeft -- %d\n", bytesLeft);
+            datasize = 0;
+            printf("Data Packet number ------------- %u\n", sequence_number);
+            printf("BytesLeft to be sent ----------- %d\n", bytesLeft);
             if(bytesLeft > MAX_PAYLOAD_SIZE){
                 datasize = MAX_PAYLOAD_SIZE;
             }
-            else {
-                datasize = bytesLeft;
-            }
-            unsigned char* data = (unsigned char*) malloc(datasize);
+            else datasize = bytesLeft;
+
+            data = (unsigned char*) malloc(datasize);
             memcpy(data, fileContent, datasize);
-            int packetsize;
-            unsigned char* packet = dataPacketBuilder(sequence_number, data, datasize, &packetsize);
+            packet = dataPacketBuilder(sequence_number, data, datasize, &packetsize);
 
             if(llwrite(packet,packetsize) == -1){
                 printf("Data packets timeout!\n");
@@ -189,46 +200,44 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             bytesLeft -= (int) MAX_PAYLOAD_SIZE;
             fileContent += datasize;
             sequence_number = (sequence_number + 1) % 255;
-            printf("sequence num -- %u\n", sequence_number);
         }
 
-        printf("Finish to transmit data file\n");
-        unsigned char *controlPacketEnd = controlPacketBuilder(3, filename, filesize, &control_packet_size);
-        total_char = llwrite(controlPacketEnd, control_packet_size);
-        if(total_char == -1) { 
+        printf(">>>>> Finish to transmit data file <<<<<<\n");
+
+        //Sends the Control Packet - End
+        controlPacketEnd = controlPacketBuilder(3, filename, file_size, &control_packet_size);
+        if(llwrite(controlPacketEnd, control_packet_size) == -1) { 
             printf("Exit: error in end packet\n");
             exit(-1);
         }
 
-        llclose(1);           
+        if(llclose(1) == -1) printf("Error during llclose()\n");           
         break;
 
 
     case LlRx:
 
+        //Recives the Control Packet
         control_packet = (unsigned char *)malloc(MAX_PAYLOAD_SIZE);
-
         control_packet_size = llread(control_packet); 
-        int fileSize = 0;
         char fileName[100] = "";
-        fileSize = controlPacketInfo(control_packet, control_packet_size, fileName);
+        file_size = controlPacketInfo(control_packet, control_packet_size, fileName);
         
-        int bytes_read = 0;
-        int packetSize = 0;
-        unsigned char *file_buf = (unsigned char*)malloc(fileSize);
+        //Space to save the content from File
+        fileBuf = (unsigned char*)malloc(file_size);
+        if (fileBuf == NULL) printf("Erro ao alocar memória.\n");
 
-        if (file_buf == NULL) printf("Erro ao alocar memória.\n");
-
+        //Recives the bytes from the data packet
         unsigned char data_packet[MAX_PAYLOAD_SIZE];
-        while (bytes_read < fileSize)
+        while (bytes_read < file_size)
         {
-            packetSize = llread(data_packet);
-            if (data_packet[0] != 3 && packetSize != -1)
+            packetsize = llread(data_packet);
+            if (data_packet[0] != 3 && packetsize != -1)
             {
-                for (int i = 0; i < packetSize - 4; i++)
-                    file_buf[bytes_read++] = data_packet[4 + i];
+                for (int i = 0; i < packetsize - 4; i++)
+                    fileBuf[bytes_read++] = data_packet[4 + i];
+                printf("Bytes read ----------- %d\n", bytes_read);
             }
-            printf("bytes_read --%d\n", bytes_read);
         }
 
         // Receives Control Packet - End
@@ -237,16 +246,16 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
 
 
         // Writes the penguin-recived file
-        FILE *rcvFile = fopen(filename, "w");
+        FILE *rcvFile = fopen(filename, "wb");
         if (rcvFile == NULL) printf("Error opening the file.\n");
-        if (fwrite(file_buf, fileSize, 1, rcvFile) != 1) printf("Error writing file.\n");
+        if (fwrite(fileBuf, file_size, 1, rcvFile) != 1) printf("Error writing file.\n");
         fclose(rcvFile);
 
         //Free memory
-        free(file_buf);
+        free(fileBuf);
         free(control_packet);
 
-        llclose(1); // numero qualquer por hora
+        if(llclose(1) == -1) printf("Error during llclose()\n"); 
 
         break;
 

@@ -4,6 +4,43 @@
 #ifndef _LINK_LAYER_H_
 #define _LINK_LAYER_H_
 
+////// Student's definitions //////////
+
+#define FLAG 0x7e
+#define A_T 0x03 
+#define A_R 0x01
+
+#define C_SET 0x03
+#define C_UA 0x07
+#define C_RR0 0xAA
+#define C_RR1 0xAB
+#define C_REJ0 0x54
+#define C_REJ1 0x55
+#define C_DISC 0x0B
+#define ESC 0x7D
+
+typedef enum {
+  START,
+  FLAG_RCV,
+  A_RCV,
+  C_RCV,
+  BCC1_OK,
+  DATA,
+  DATA_ESC,
+  STOP_RCV
+} state;
+
+typedef enum {
+  START_open,
+  FLAG_RCV_open,
+  A_RCV_open,
+  C_RCV_open,
+  BCC1_OK_open,
+  STOP_RCV_open
+} open_state;
+
+//////////////////////////////
+
 typedef enum
 {
     LlTx,

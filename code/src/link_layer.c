@@ -8,25 +8,10 @@
 #include <unistd.h>
 #include <stdlib.h>
 
-
 // MISC
 #define _POSIX_SOURCE 1 // POSIX compliant source
 
-#define FLAG 0x7e
-
-#define A_T 0x03 //commands sent by the Transmitter or replies sent by the Receiver
-#define A_R 0x01 //commands sent by the Receiver or replies sent by the Transmitter
-
-#define C_SET 0x03
-#define C_UA 0x07
-#define C_RR0 0xAA
-#define C_RR1 0xAB
-#define C_REJ0 0x54
-#define C_REJ1 0x55
-#define C_DISC 0x0B
-
-#define ESC 0x7D
-
+// Definition of usefull variables 
 int alarmEnabled = FALSE;
 int alarmCount = 0;
 unsigned char frameX = 0;
@@ -39,6 +24,10 @@ struct Statistics {
     int numberTimeouts;
 } statistics = {0,0,0};
 
+
+////////////////////////////////////////////////
+// Auxiliar functions
+////////////////////////////////////////////////
 void alarmHandler(int signal)
 {   
     alarmEnabled = FALSE;
@@ -46,32 +35,16 @@ void alarmHandler(int signal)
     statistics.numberRetransmissions++;
 }
 
-
+/**
+ * Sends the ACK frame
+ * @param A adress field
+ * @param C control field
+ * @return returns -1 on error, otherwise the number of bytes written.
+ */
 int sendControlFrame (unsigned char A, unsigned char C){
     unsigned char frame[5] = {FLAG, A, C, A^C, FLAG};
     return writeBytesSerialPort(frame, 5);
 }
-
-
-typedef enum {
-  START,
-  FLAG_RCV,
-  A_RCV,
-  C_RCV,
-  BCC1_OK,
-  DATA,
-  DATA_ESC,
-  STOP_RCV
-} state;
-
-typedef enum {
-  START_open,
-  FLAG_RCV_open,
-  A_RCV_open,
-  C_RCV_open,
-  BCC1_OK_open,
-  STOP_RCV_open
-} open_state;
 
 
 ////////////////////////////////////////////////
@@ -105,7 +78,6 @@ int llopen(LinkLayer connectionParameters)
 
             while(current_state != STOP_RCV_open && alarmEnabled==TRUE) {
                 if(readByteSerialPort(&byte)) {
-                    //printf("buffer -- 0x%02X\n", byte);
                     switch (current_state)
                     {
                     case START_open:
@@ -207,7 +179,6 @@ int llopen(LinkLayer connectionParameters)
 ////////////////////////////////////////////////
 int llwrite(const unsigned char *buf, int bufSize)
 {
-    //printf("frameX --- 0x%02X\n", frameX);
     int framesize = bufSize+6;
     state current_state = START;
     alarmCount = 0;
@@ -224,8 +195,8 @@ int llwrite(const unsigned char *buf, int bufSize)
 
     memcpy(frame+4, buf, bufSize);
 
+    // Byte Stuffing data
     int j = 4;
-
     for (int i = 0; i < bufSize; i++) {
         
         if(buf[i] == FLAG || buf[i] == ESC)
@@ -233,36 +204,26 @@ int llwrite(const unsigned char *buf, int bufSize)
                 framesize++;
                 frame = realloc(frame, framesize);
                 
-                frame[j] = ESC;
-                j++;
-                if (buf[i] == FLAG) frame[j] = 0x5E;
-                else frame[j] = 0x5D;
-                j++;
+                frame[j++] = ESC;
+                if (buf[i] == FLAG) frame[j++] = 0x5E;
+                else frame[j++] = 0x5D;
         }
-        else
-        {
-            frame[j] = buf[i];
-            j++;
-        }     
+        else frame[j++] = buf[i];   
     }
 
-
+    // Byte Stuffing BCC2
     if (BCC2 == FLAG || BCC2 == ESC) 
     {
         framesize++;
         frame = realloc(frame, framesize);
-        frame[j] = ESC;
-        j++;
-        if (BCC2 == FLAG) frame[j] = 0x5E;
-        else frame[j] = 0x5D;
-        j++;
+        frame[j++] = ESC;
+
+        if (BCC2 == FLAG) frame[j++] = 0x5E;
+        else frame[j++] = 0x5D;
     } 
-    else {
-        frame[j] = BCC2;
-        j++;
-    }
-    frame[j] = FLAG;
-    j++;
+    else frame[j++] = BCC2;
+
+    frame[j++] = FLAG;
 
     while (alarmCount < totalRetransmitions && current_state != STOP_RCV) {
             writeBytesSerialPort(frame, j);
@@ -275,7 +236,7 @@ int llwrite(const unsigned char *buf, int bufSize)
 
             while(current_state != STOP_RCV && alarmEnabled==TRUE) {
                 if(readByteSerialPort(&byte)) {
-                    //printf("buffer -- 0x%02X\n", byte);
+
                     switch (current_state)
                     {
                     case START:
@@ -295,7 +256,7 @@ int llwrite(const unsigned char *buf, int bufSize)
                             current_state = START;
                             alarmEnabled=FALSE;
                         }
-                        else if (byte == C_RR0 || byte == C_RR1){
+                        else if ((frameX == 0x80 && byte == C_RR0) || (frameX == 0x00 && byte == C_RR1)){
                             cField = byte;
                             current_state = C_RCV;
                         }
@@ -311,7 +272,6 @@ int llwrite(const unsigned char *buf, int bufSize)
                     case BCC1_OK:
                         if (byte == FLAG){
                             frameX = frameX ? 0x00 : 0x80;
-                            //printf("Mensagem do reciver foi recebida com sucesso!\n");
                             current_state = STOP_RCV;
                         }
                         else {
@@ -340,7 +300,6 @@ int llwrite(const unsigned char *buf, int bufSize)
 ////////////////////////////////////////////////
 int llread(unsigned char *packet)
 {
-    printf("FrameX --- 0x%02X\n", frameX);
     state cur_state = START;
     int i = 0;
     unsigned char controlField = 0x00;
@@ -350,7 +309,7 @@ int llread(unsigned char *packet)
     {
         if(readByteSerialPort(&byte))
         {
-            //printf("buffer -- 0x%02X\n", byte);
+
             switch (cur_state) {
                 case START:
                     if (byte == FLAG) cur_state = FLAG_RCV;
@@ -404,7 +363,6 @@ int llread(unsigned char *packet)
                                 statistics.NumberFramesSent++;
                             }
                             frameX = frameX ? 0x00 : 0x80;
-                            printf("Mensagem do transmiter foi recebida com sucesso!\n");
                             cur_state = STOP_RCV;
                             return (i - 1);
                         } 
@@ -463,7 +421,6 @@ int llclose(int showStatistics)
 
     while(alarmCount < totalRetransmitions && cur_state != STOP_RCV){
         sendControlFrame(A_R, C_DISC);
-        //printf("Transmission: %d\n", alarmCount+1);
 
         alarm(timeout);
         alarmEnabled = TRUE;
