@@ -155,6 +155,10 @@ int llopen(LinkLayer connectionParameters)
 
                 case A_RCV:
                     if (byte == FLAG) current_state = FLAG_RCV;
+                    else if ((byte == 0x80) || (byte == 0x00)){
+                        current_state = STOP_RCV;
+                        printf("SET recived and llopen() done. Keep going! \n");
+                    }
                     else if (byte == C_SET) current_state = C_RCV;
                     else current_state = START;
                     break;
@@ -168,10 +172,10 @@ int llopen(LinkLayer connectionParameters)
                 case BCC1_OK:
                     if (byte == FLAG)
                     {
-                        current_state = STOP_RCV;
+                        current_state = START;
                         sendControlFrame(A_R, C_UA);
                         statistics.NumberFramesSent++;
-                        printf("SET recived and llopen() done. Keep going! \n");
+                        
                     }
                     else current_state = START;
                     break;
@@ -348,8 +352,15 @@ int llread(unsigned char *packet)
                     else cur_state = START;
                     break;  
                 case A_RCV:
-                    if (byte == 0x00 || byte == 0x80){
-                        controlField = byte;
+                    if (frameX == 0x00 && byte == 0x80){
+                        sendControlFrame(A_R, C_RR0);
+                        cur_state = START;
+                    }
+                    else if (frameX == 0x80 && byte == 0x00){
+                        sendControlFrame(A_R, C_RR1);
+                        cur_state = START;
+                    }
+                    else if ((frameX == 0x00 && byte == 0x00) || (frameX == 0x80 && byte == 0x80)){
                         cur_state = C_RCV;
                     }
                     else if (byte == FLAG) cur_state = FLAG_RCV;
@@ -361,7 +372,7 @@ int llread(unsigned char *packet)
                     else cur_state = START;
                     break;
                 case C_RCV:
-                    if(byte == (A_T^controlField)) cur_state = DATA;
+                    if(byte == (A_T^frameX)) cur_state = DATA;
                     else if(byte == FLAG) cur_state = FLAG_RCV;
                     else cur_state = START;
                     break; 
@@ -375,7 +386,7 @@ int llread(unsigned char *packet)
 
                         if(bcc2 == bcc2_checker)
                         {
-                            if (controlField) {
+                            if (frameX) {
                                 sendControlFrame(A_R, C_RR0);
                                 statistics.NumberFramesSent++;
                             }
@@ -483,7 +494,7 @@ int llclose(int showStatistics)
         }
     }
 
-    if(showStatistics == 1){
+    if(showStatistics == 1 && cur_state == STOP_RCV){
         printf("=======STATISTICS=======\n");
         printf("Number of frames sent: %d\n", statistics.NumberFramesSent);
         printf("Number of retransmissions: %d\n", statistics.numberRetransmissions);
