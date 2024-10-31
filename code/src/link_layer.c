@@ -361,7 +361,6 @@ int llread(unsigned char *packet)
 {
     state cur_state = START;
     int i = 0;
-    unsigned char controlField = 0x00;
     unsigned char bcc2_checker = 0x00;
 
     while (cur_state != STOP_RCV)
@@ -446,7 +445,7 @@ int llread(unsigned char *packet)
                     else
                     {
                         printf("Error: bbc2 checker fail :( \n");
-                        if (controlField)
+                        if (frameX)
                         {
                             sendControlFrame(A_R, C_REJ1);
                             statistics.NumberFramesSent++;
