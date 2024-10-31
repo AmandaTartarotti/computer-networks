@@ -18,6 +18,8 @@ int alarmCount = 0;
 unsigned char frameX = 0;
 unsigned char byte;
 int totalRetransmitions, timeout;
+clock_t start, end;
+LinkLayerRole role;
 
 struct Statistics
 {
@@ -27,7 +29,6 @@ struct Statistics
     float executionTime;
 } statistics = {0, 0, 0, 0.0};
 
-clock_t start, end;
 ////////////////////////////////////////////////
 // Auxiliar functions
 ////////////////////////////////////////////////
@@ -65,8 +66,9 @@ int llopen(LinkLayer connectionParameters)
     open_state current_state = START;
     totalRetransmitions = connectionParameters.nRetransmissions;
     timeout = connectionParameters.timeout;
+    role = connectionParameters.role;
 
-    switch (connectionParameters.role)
+    switch (role)
     {
     case LlTx: // Transmitter
 
@@ -497,19 +499,82 @@ int llclose(int showStatistics)
     state cur_state = START;
     unsigned char byte;
     alarmCount = 0;
-
-    while (alarmCount < totalRetransmitions && cur_state != STOP_RCV)
+    switch (role)
     {
-        sendControlFrame(A_R, C_DISC);
+    case LlTx:
+        while (alarmCount < totalRetransmitions && cur_state != STOP_RCV){
+            sendControlFrame(A_R, C_DISC);
+            alarm(timeout);
+            alarmEnabled = TRUE;
+            while (cur_state != STOP_RCV && alarmEnabled == TRUE)
+            {
+                if (readByteSerialPort(&byte))
+                {
+                    switch (cur_state)
+                    {
+                    case START:
+                        if (byte == FLAG)
+                            cur_state = FLAG_RCV;
+                        break;
+                    case FLAG_RCV:
+                        if (byte == A_R)
+                            cur_state = A_RCV;
+                        else if (byte == FLAG)
+                            break;
+                        else
+                            cur_state = START;
+                        break;
+                    case A_RCV:
+                        if (byte == C_DISC)
+                            cur_state = C_RCV;
+                        else if (byte == FLAG)
+                            cur_state = FLAG_RCV;
+                        else
+                            cur_state = START;
+                        break;
+                    case C_RCV:
+                        if (byte == (A_R ^ C_DISC))
+                            cur_state = BCC1_OK;
+                        else if (byte == FLAG)
+                            cur_state = FLAG_RCV;
+                        else
+                            cur_state = START;
+                        break;
+                    case BCC1_OK:
+                        if (byte == FLAG)
+                        {
+                            printf("Close() sucessfull!\n");
+                            sendControlFrame(A_R, C_UA);
+                            cur_state = STOP_RCV;
+                        }
+                        else
+                            cur_state = START;
+                        break;
+                    default:
+                        printf("Oh no! Error during Close()\n");
+                        break;
+                    }
+                }
+            }
+        }
 
-        alarm(timeout);
-        alarmEnabled = TRUE;
-        while (cur_state != STOP_RCV && alarmEnabled == TRUE)
+        end = clock();
+        statistics.executionTime = ((double)(end - start)) / CLOCKS_PER_SEC;
+        if (showStatistics == 1 && cur_state == STOP_RCV)
+        {
+            printf("=======STATISTICS=======\n");
+            printf("Number of frames sent: %d\n", statistics.NumberFramesSent);
+            printf("Number of retransmissions: %d\n", statistics.numberRetransmissions);
+            printf("Execution time: %.2f\n", statistics.executionTime);
+        }
+
+        break;
+    case LlRx:
+        while (cur_state != STOP_RCV)
         {
             if (readByteSerialPort(&byte))
             {
-                switch (cur_state)
-                {
+                switch (cur_state) {
                 case START:
                     if (byte == FLAG)
                         cur_state = FLAG_RCV;
@@ -542,7 +607,7 @@ int llclose(int showStatistics)
                     if (byte == FLAG)
                     {
                         printf("Close() sucessfull!\n");
-                        sendControlFrame(A_T, C_UA);
+                        sendControlFrame(A_R, C_DISC);
                         cur_state = STOP_RCV;
                     }
                     else
@@ -554,15 +619,9 @@ int llclose(int showStatistics)
                 }
             }
         }
-    }
-    end = clock();
-    statistics.executionTime = ((double)(end - start)) / CLOCKS_PER_SEC;
-    if (showStatistics == 1 && cur_state == STOP_RCV)
-    {
-        printf("=======STATISTICS=======\n");
-        printf("Number of frames sent: %d\n", statistics.NumberFramesSent);
-        printf("Number of retransmissions: %d\n", statistics.numberRetransmissions);
-        printf("Execution time: %.2f\n", statistics.executionTime);
+        break;
+    default:
+        break;
     }
 
     int clstat = closeSerialPort();
