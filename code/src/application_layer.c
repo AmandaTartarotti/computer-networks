@@ -156,7 +156,10 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
 
         control_packet = controlPacketBuilder(1, filename, filesize, &control_packet_size);
 
-        if (llwrite(control_packet, control_packet_size) == -1) printf("Llwrite Control Packet error\n");
+        if (llwrite(control_packet, control_packet_size) == -1) {
+            printf("Llwrite Control Packet error\n");
+            exit(-1);
+        }
 
         unsigned char sequence_number = 0;
         unsigned char* fileContent = (unsigned char*)malloc(sizeof(unsigned char) * filesize);

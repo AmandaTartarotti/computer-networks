@@ -29,7 +29,7 @@
 
 int alarmEnabled = FALSE;
 int alarmCount = 0;
-unsigned char frameTx = 0;
+unsigned char frameX = 0;
 unsigned char byte;
 int totalRetransmitions, timeout;
 
@@ -193,13 +193,14 @@ int llopen(LinkLayer connectionParameters)
 ////////////////////////////////////////////////
 int llwrite(const unsigned char *buf, int bufSize)
 {
+    printf("frameX --- 0x%02X\n", frameX);
     int framesize = bufSize+6;
     state current_state = START;
     alarmCount = 0;
     unsigned char *frame = (unsigned char *) malloc(framesize);
     frame[0] = FLAG;
     frame[1] = A_T;
-    frame[2] = frameTx ? 0x80 : 0x00;
+    frame[2] = frameX ? 0x80 : 0x00;
     frame[3] = frame[1] ^ frame[2];
 
     unsigned char BCC2 = 0x00;
@@ -282,8 +283,6 @@ int llwrite(const unsigned char *buf, int bufSize)
                         }
                         else if (byte == C_RR0 || byte == C_RR1){
                             cField = byte;
-                            if (frameTx == 0) frameTx = 1;
-                            else frameTx = 0;
                             current_state = C_RCV;
                         }
                         else current_state = START;
@@ -297,6 +296,7 @@ int llwrite(const unsigned char *buf, int bufSize)
 
                     case BCC1_OK:
                         if (byte == FLAG){
+                            frameX = frameX ? 0x00 : 0x80;
                             printf("Mensagem do reciver foi recebida com sucesso!\n");
                             current_state = STOP_RCV;
                         }
@@ -326,6 +326,7 @@ int llwrite(const unsigned char *buf, int bufSize)
 ////////////////////////////////////////////////
 int llread(unsigned char *packet)
 {
+    printf("FrameX --- 0x%02X\n", frameX);
     state cur_state = START;
     int i = 0;
     unsigned char controlField = 0x00;
@@ -381,6 +382,7 @@ int llread(unsigned char *packet)
                                 sendControlFrame(A_R, C_RR1);
                                 statistics.NumberFramesSent++;
                             }
+                            frameX = frameX ? 0x00 : 0x80;
                             printf("Mensagem do transmiter foi recebida com sucesso!\n");
                             cur_state = STOP_RCV;
                             return (i - 1);
