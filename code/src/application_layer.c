@@ -138,6 +138,8 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         exit(-1);
     }
 
+    printf("\n>>>>> Finish llopen() <<<<<<\n\n");
+
     // Definition of usefull variables 
     FILE* fptr; 
     unsigned char* data;
@@ -171,7 +173,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             printf("Llwrite Control Packet error\n");
             exit(-1);
         }
-        printf("Control packet sent!\n");
+        printf("\n>>>>> Control packet sent! <<<<<\n");
 
         fileContent = (unsigned char*)malloc(sizeof(unsigned char) * file_size);
         if (fileContent == NULL) printf("Erro ao alocar memória.\n");
@@ -204,7 +206,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             sequence_number = (sequence_number + 1) % 255;
         }
 
-        printf("\n>>>>> Finish to transmit data file <<<<<<\n\n");
+        printf("\n>>>>> Finish to send data information <<<<<<\n\n");
 
         //Sends the Control Packet - End
         controlPacketEnd = controlPacketBuilder(3, filename, file_size, &control_packet_size);
@@ -224,6 +226,8 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         control_packet_size = llread(control_packet); 
         char fileName[100] = "";
         file_size = controlPacketInfo(control_packet, control_packet_size, fileName);
+
+        printf(">>>>> Control packet recived! <<<<<\n\n");
         
         //Space to save the content from File
         fileBuf = (unsigned char*)malloc(file_size);
@@ -241,6 +245,8 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                 printf("Bytes read ----------- %d\n", bytes_read);
             }
         }
+
+        printf("\n>>>>> Finish to recive data information <<<<<<\n");
 
         // Receives Control Packet - End
         unsigned char packet_control_end[MAX_PAYLOAD_SIZE];

@@ -125,7 +125,7 @@ int llopen(LinkLayer connectionParameters)
                         if (byte == FLAG)
                         {
                             current_state = STOP_RCV_open;
-                            printf("UA recived\n\n");
+                            printf("UA recived with success!\n");
                         }
                         else
                             current_state = START_open;
@@ -166,7 +166,7 @@ int llopen(LinkLayer connectionParameters)
                     else if ((byte == 0x80) || (byte == 0x00))
                     {
                         current_state = STOP_RCV_open;
-                        printf("SET recived\n");
+                        printf("SET recived with success!\n");
                     }
                     else if (byte == C_SET)
                         current_state = C_RCV_open;
@@ -303,7 +303,7 @@ int llwrite(const unsigned char *buf, int bufSize)
                         current_state = FLAG_RCV;
                     else if (byte == C_REJ0 || byte == C_REJ1)
                     {
-                        printf("Looks like we had problems, recived rejection byte 0x%02X\n", byte);
+                        printf("\nLooks like we had problems, recived rejection byte 0x%02X\n", byte);
                         current_state = START;
                         alarmEnabled = FALSE;
                     }
@@ -542,7 +542,7 @@ int llclose(int showStatistics)
                     case BCC1_OK:
                         if (byte == FLAG)
                         {
-                            printf("Close() sucessfull!\n");
+                            printf(">>>>> Close() sucessfull! <<<<<< \n");
                             sendControlFrame(A_R, C_UA);
                             cur_state = STOP_RCV;
                         }
@@ -550,7 +550,7 @@ int llclose(int showStatistics)
                             cur_state = START;
                         break;
                     default:
-                        printf("Oh no! Error during Close()\n");
+                        printf("Oh no! Error during Close()\n\n");
                         break;
                     }
                 }
@@ -605,7 +605,7 @@ int llclose(int showStatistics)
                 case BCC1_OK:
                     if (byte == FLAG)
                     {
-                        printf("Close() sucessfull!\n");
+                        printf("\n>>>>> Close() sucessfull! <<<<<<\n\n");
                         sendControlFrame(A_R, C_DISC);
                         cur_state = STOP_RCV;
                     }
