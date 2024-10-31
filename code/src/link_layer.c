@@ -64,6 +64,15 @@ typedef enum {
   STOP_RCV
 } state;
 
+typedef enum {
+  START_open,
+  FLAG_RCV_open,
+  A_RCV_open,
+  C_RCV_open,
+  BCC1_OK_open,
+  STOP_RCV_open
+} open_state;
+
 
 ////////////////////////////////////////////////
 // LLOPEN
@@ -76,7 +85,7 @@ int llopen(LinkLayer connectionParameters)
         return -1;
     }
 
-    state current_state = START;
+    open_state current_state = START;
     totalRetransmitions = connectionParameters.nRetransmissions;
     timeout = connectionParameters.timeout;
     
@@ -87,47 +96,47 @@ int llopen(LinkLayer connectionParameters)
         (void)signal(SIGALRM, alarmHandler);
         alarmCount = 0;
 
-        while (alarmCount < totalRetransmitions && current_state != STOP_RCV) {
+        while (alarmCount < totalRetransmitions && current_state != STOP_RCV_open) {
             sendControlFrame(A_T, C_SET);
             printf("Transmission: %d\n", alarmCount+1);
             statistics.NumberFramesSent++;
             alarm(timeout);
             alarmEnabled = TRUE;
 
-            while(current_state != STOP_RCV && alarmEnabled==TRUE) {
+            while(current_state != STOP_RCV_open && alarmEnabled==TRUE) {
                 if(readByteSerialPort(&byte)) {
                     //printf("buffer -- 0x%02X\n", byte);
                     switch (current_state)
                     {
-                    case START:
-                        if (byte == FLAG) current_state = FLAG_RCV;
+                    case START_open:
+                        if (byte == FLAG) current_state = FLAG_RCV_open;
                         break;
 
-                    case FLAG_RCV:
-                        if (byte == A_R) current_state = A_RCV;
+                    case FLAG_RCV_open:
+                        if (byte == A_R) current_state = A_RCV_open;
                         else if (byte == FLAG) break;
-                        else current_state = START;
+                        else current_state = START_open;
                         break;
 
-                    case A_RCV:
-                        if (byte == FLAG) current_state = FLAG_RCV;
-                        else if (byte == C_UA) current_state = C_RCV;
-                        else current_state = START;
+                    case A_RCV_open:
+                        if (byte == FLAG) current_state = FLAG_RCV_open;
+                        else if (byte == C_UA) current_state = C_RCV_open;
+                        else current_state = START_open;
                         break;
 
-                    case C_RCV:
-                        if (byte == FLAG) current_state = FLAG_RCV;
-                        else if (byte == (A_R^C_UA)) current_state = BCC1_OK;
-                        else current_state = START;
+                    case C_RCV_open:
+                        if (byte == FLAG) current_state = FLAG_RCV_open;
+                        else if (byte == (A_R^C_UA)) current_state = BCC1_OK_open;
+                        else current_state = START_open;
                         break;
 
-                    case BCC1_OK:
+                    case BCC1_OK_open:
                         if (byte == FLAG){
-                            current_state = STOP_RCV;
-                            printf("UA recived and llopen() done. Keep going! \n");
+                            current_state = STOP_RCV_open;
+                            printf("UA recived\n");
                         }
                         else 
-                            current_state = START;
+                            current_state = START_open;
                         break;
                     default:
                         break;
@@ -137,49 +146,49 @@ int llopen(LinkLayer connectionParameters)
         }
         break;
     case LlRx:
-        while (current_state != STOP_RCV) {
+        while (current_state != STOP_RCV_open) {
 
             if(readByteSerialPort(&byte)) {
                 //printf("buffer -- 0x%02X\n", byte);
                 switch (current_state)
                 {
-                case START:
-                    if (byte == FLAG) current_state = FLAG_RCV;
+                case START_open:
+                    if (byte == FLAG) current_state = FLAG_RCV_open;
                     break;
 
-                case FLAG_RCV:
-                    if (byte == A_T) current_state = A_RCV;
+                case FLAG_RCV_open:
+                    if (byte == A_T) current_state = A_RCV_open;
                     else if (byte == FLAG) break;
-                    else current_state = START;
+                    else current_state = START_open;
                     break;
 
-                case A_RCV:
-                    if (byte == FLAG) current_state = FLAG_RCV;
+                case A_RCV_open:
+                    if (byte == FLAG) current_state = FLAG_RCV_open;
                     else if ((byte == 0x80) || (byte == 0x00)){
-                        current_state = STOP_RCV;
-                        printf("SET recived and llopen() done. Keep going! \n");
+                        current_state = STOP_RCV_open;
+                        printf("SET recived\n");
                     }
-                    else if (byte == C_SET) current_state = C_RCV;
-                    else current_state = START;
+                    else if (byte == C_SET) current_state = C_RCV_open;
+                    else current_state = START_open;
                     break;
 
-                case C_RCV:
-                    if (byte == FLAG) current_state = FLAG_RCV;
-                    else if (byte == (A_T ^ C_SET)) current_state = BCC1_OK;
-                    else current_state = START;
+                case C_RCV_open:
+                    if (byte == FLAG) current_state = FLAG_RCV_open;
+                    else if (byte == (A_T ^ C_SET)) current_state = BCC1_OK_open;
+                    else current_state = START_open;
                     break;
 
-                case BCC1_OK:
+                case BCC1_OK_open:
                     if (byte == FLAG)
                     {
-                        current_state = START;
+                        current_state = START_open;
                         sendControlFrame(A_R, C_UA);
                         statistics.NumberFramesSent++;
                         
                     }
-                    else current_state = START;
+                    else current_state = START_open;
                     break;
-                case STOP_RCV:
+                case STOP_RCV_open:
                     break;
                 }
             }
@@ -189,7 +198,7 @@ int llopen(LinkLayer connectionParameters)
         break;
     }
 
-    if(current_state != STOP_RCV) return -1;
+    if(current_state != STOP_RCV_open) return -1;
     return 1;
 }
 
@@ -198,7 +207,7 @@ int llopen(LinkLayer connectionParameters)
 ////////////////////////////////////////////////
 int llwrite(const unsigned char *buf, int bufSize)
 {
-    printf("frameX --- 0x%02X\n", frameX);
+    //printf("frameX --- 0x%02X\n", frameX);
     int framesize = bufSize+6;
     state current_state = START;
     alarmCount = 0;
@@ -302,7 +311,7 @@ int llwrite(const unsigned char *buf, int bufSize)
                     case BCC1_OK:
                         if (byte == FLAG){
                             frameX = frameX ? 0x00 : 0x80;
-                            printf("Mensagem do reciver foi recebida com sucesso!\n");
+                            //printf("Mensagem do reciver foi recebida com sucesso!\n");
                             current_state = STOP_RCV;
                         }
                         else {

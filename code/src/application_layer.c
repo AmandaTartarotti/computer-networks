@@ -182,7 +182,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             unsigned char* packet = dataPacketBuilder(sequence_number, data, datasize, &packetsize);
 
             if(llwrite(packet,packetsize) == -1){
-                printf("Error in data packets\n");
+                printf("Data packets timeout!\n");
                 exit(-1);
             }
 
@@ -233,7 +233,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
 
         // Receives Control Packet - End
         unsigned char packet_control_end[MAX_PAYLOAD_SIZE];
-        llread(packet_control_end); 
+        if(llread(packet_control_end) == -1) printf("Error reading final control packet!\n"); 
 
 
         // Writes the penguin-recived file
