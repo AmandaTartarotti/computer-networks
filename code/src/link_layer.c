@@ -33,10 +33,17 @@ unsigned char frameTx = 0;
 unsigned char byte;
 int totalRetransmitions, timeout;
 
+struct Statistics {
+    int NumberFramesSent;
+    int numberRetransmissions;
+    int numberTimeouts;
+} statistics = {0,0,0};
+
 void alarmHandler(int signal)
 {   
     alarmEnabled = FALSE;
     alarmCount++;
+    statistics.numberRetransmissions++;
 }
 
 
@@ -56,12 +63,6 @@ typedef enum {
   DATA_ESC,
   STOP_RCV
 } state;
-
-struct Statistics {
-    int NumberFramesSent;
-    int numberRetransmissions;
-    int numberTimeouts;
-} statistics = {0,0,0};
 
 
 ////////////////////////////////////////////////
@@ -483,6 +484,7 @@ int llclose(int showStatistics)
     if(showStatistics == 1){
         printf("=======STATISTICS=======\n");
         printf("Number of frames sent: %d\n", statistics.NumberFramesSent);
+        printf("Number of retransmissions: %d\n", statistics.numberRetransmissions);
     }
 
     int clstat = closeSerialPort();
