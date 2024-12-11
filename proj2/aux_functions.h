@@ -15,7 +15,7 @@ int recived_status(unsigned char* buf, unsigned char* status);
  * 
  * @return 0 uppon sucess and -1 if fails
  */
-int get_url_info();
+int get_url_info(char *argv, char *username, char *password, char *host, char *urlpath);
 
 int readServer(int sockfd, char *status);
 

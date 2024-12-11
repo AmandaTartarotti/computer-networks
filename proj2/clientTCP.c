@@ -29,15 +29,22 @@ typedef enum{
 
 int main(int argc, char **argv) {
 
-    if (argc > 1)
-        printf("**** No arguments needed. They will be ignored. Carrying ON.\n");
+    char username[MAX_LENGTH];
+    char password[MAX_LENGTH];
+    char host[MAX_LENGTH];
+    char urlpath[MAX_LENGTH];
+
+    if (argc != 2) {
+        printf("Usage: %s %s\n", argv[0], "ftp://[<user>:<password>@]<host>/<url-path>");
+        return -1;
+    }
+
+    if (get_url_info(argv[1], username, password, host, urlpath) != 0) {
+        return -1;
+    }
 
     int sockfd;
     struct sockaddr_in server_addr;
-
-    char buf[MAX_LENGTH];
-    //char stat_buf[100];
-    char user[] = "USER anonymous\n";
 
     size_t bytes;
 
@@ -69,7 +76,7 @@ int main(int argc, char **argv) {
     
     if(strcmp(status,"220")){
         bytes = write(sockfd, "USER anonymous\n", strlen("USER anonymous\n"));
-        printf("$client: %s", user);
+        printf("$client: %s", "USER anonymous\n");
     }
 
     if(readServer(sockfd, status)<0){
@@ -78,7 +85,7 @@ int main(int argc, char **argv) {
 
     if(strcmp(status,"331")){
         bytes = write(sockfd, "PASS anonymous\n", strlen("PASS anonymous\n"));
-        printf("$client: %s", user);
+        printf("$client: %s", "PASS anonymous\n");
     }
 
     if(readServer(sockfd, status)<0){
@@ -87,7 +94,7 @@ int main(int argc, char **argv) {
 
     if(strcmp(status,"230")){
         bytes = write(sockfd, "pasv\n", strlen("pasv\n"));
-        printf("$client: %s", user);
+        printf("$client: %s", "pasv\n");
     }
 
     if(readServer(sockfd, status)<0){
