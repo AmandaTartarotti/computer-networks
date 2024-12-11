@@ -71,7 +71,7 @@ int main(int argc, char **argv) {
     char status_331[] = "331";
     char status_230[] = "230";
 
-    char username_buf[] = "USER anonymous";
+    char username_buf[] = "USER anonymous\n";
     char password_buf[] = "PASS anonymous";
 
     /*server address handling*/
@@ -135,16 +135,14 @@ int main(int argc, char **argv) {
             case READ_STATUS:
 
                 memset (stat_buf,' ',100);
-                printf("Line 126\n");
                 stat_bytes = read(sockfd, stat_buf, strlen(stat_buf) - 1);
-                printf("Line 128\n");
                 if (stat_bytes < 1) perror("read()");
 
                 //To debug
                 printf("Number os bytes read: %ld\n", stat_bytes);
                 printf("Read message: %s\n", stat_buf);
 
-                get_status = recived_status(buf, status_331);
+                get_status = recived_status(stat_buf, status_331);
                 if(!get_status) cur_state = WRITE_PASS;
                 else cur_state = EXIT;
 
@@ -156,8 +154,8 @@ int main(int argc, char **argv) {
                 auth_bytes = write(sockfd, password_buf, strlen(username_buf));
                 
                  //To debug
-                printf("Number os bytes read: %ld\n", auth_bytes);
-                printf("Read message: %s\n", stat_buf);
+                printf("Number os bytes write: %ld\n", auth_bytes);
+                printf("Write message: %s\n", password_buf);
 
                 get_status = recived_status(buf, status_331);
                 if(!get_status) printf("Login on server..");
