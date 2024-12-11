@@ -10,6 +10,7 @@
 #include <unistd.h>
 
 #include <string.h>
+#include "aux_functions.h"
 
 #define SERVER_PORT 21
 #define SERVER_ADDR "193.137.29.15"
@@ -25,30 +26,6 @@ typedef enum{
     FINISH,
 } state;
 
-/**
- * Checks if sucess of a performed operation
- * @param buf pointer to a recived operation menssage
- * @param status pointer to an operation expected status
- * @return 0 uppon sucess and -1 if fails
- */
-int recived_status(unsigned char* buf, unsigned char* status){
-
-    for(int i = 0; i < 3; i++){
-        if (status[i] !=  buf[i])
-            return -1;
-    }
-
-    return 0;
-}
-
-/**
- * Receive from input "ftp://[<user>:<password>@]<host>/<url-path>"
- * 
- * @return 0 uppon sucess and -1 if fails
- */
-int get_url_info(){
-    return -1;
-}
 
 int main(int argc, char **argv) {
 
@@ -59,20 +36,10 @@ int main(int argc, char **argv) {
     struct sockaddr_in server_addr;
 
     char buf[MAX_LENGTH];
-    char stat_buf[100];
+    //char stat_buf[100];
+    char user[] = "USER anonymous\n";
 
     size_t bytes;
-
-    int get_status;
-    size_t auth_bytes;
-    size_t stat_bytes;
-
-    char status_200[] = "220";
-    char status_331[] = "331";
-    char status_230[] = "230";
-
-    char username_buf[] = "USER anonymous\n";
-    char password_buf[] = "PASS anonymous";
 
     /*server address handling*/
     bzero((char *) &server_addr, sizeof(server_addr));
@@ -93,129 +60,43 @@ int main(int argc, char **argv) {
         exit(-1);
     }
 
-    state cur_state = START;
- 
-    //State machine implementation
-    while (cur_state != FINISH){
-        switch(cur_state){
-
-            case START:
-                memset (buf,' ',MAX_LENGTH);
-                bytes = read(sockfd, buf, strlen(buf) - 1);
-
-                if (bytes < 1) perror("read()");
-
-                //To debug
-                printf("Number os bytes read: %ld\n", bytes);
-                printf("Received message: %s\n", buf);
-
-                get_status = recived_status(buf, status_200);
-                if(!get_status) cur_state = WRITE_USER;
-                else cur_state = EXIT;
-
-                break; 
-
-            case WRITE_USER:
-                printf("Process started with success!\n");
-                printf("------------------------------\n");
-
-                auth_bytes = write(sockfd, username_buf, strlen(username_buf));
-
-                if (auth_bytes < 1) printf("Could not write username");
-
-                //To debug
-                if (auth_bytes > 0) {
-                    printf("Number os bytes write: %ld\n", auth_bytes);
-                    printf("Writed message: %s\n", username_buf);
-                }
-
-                cur_state = READ_STATUS;
-                break;
-
-            case READ_STATUS:
-
-                memset (stat_buf,' ',100);
-                stat_bytes = read(sockfd, stat_buf, strlen(stat_buf) - 1);
-                if (stat_bytes < 1) perror("read()");
-
-                //To debug
-                printf("Number os bytes read: %ld\n", stat_bytes);
-                printf("Read message: %s\n", stat_buf);
-
-                get_status = recived_status(stat_buf, status_331);
-                if(!get_status) cur_state = WRITE_PASS;
-                else cur_state = EXIT;
-
-                break;
-            
-            case WRITE_PASS:
-                printf("Login on server..");
-
-                auth_bytes = write(sockfd, password_buf, strlen(username_buf));
-                
-                 //To debug
-                printf("Number os bytes write: %ld\n", auth_bytes);
-                printf("Write message: %s\n", password_buf);
-
-                get_status = recived_status(buf, status_331);
-                if(!get_status) printf("Login on server..");
-
-                cur_state = FINISH;
-
-                break;
-
-            case EXIT:
-                printf("\nOh no! Something went wrong :c\nAborting operation\n");
-                exit(-1);
-                break;
-
-            default:
-                break;
-        }
+    char status[3];
+    printf("$client: starts connection with the server\n");
+    sleep(0.5);
+    if(readServer(sockfd, status)<0){
+        printf("failed read");
+    };
+    
+    if(strcmp(status,"220")){
+        bytes = write(sockfd, "USER anonymous\n", strlen("USER anonymous\n"));
+        printf("$client: %s", user);
     }
+
+    if(readServer(sockfd, status)<0){
+        printf("failed read");
+    };
+
+    if(strcmp(status,"331")){
+        bytes = write(sockfd, "PASS anonymous\n", strlen("PASS anonymous\n"));
+        printf("$client: %s", user);
+    }
+
+    if(readServer(sockfd, status)<0){
+        printf("failed read");
+    };
+
+    if(strcmp(status,"230")){
+        bytes = write(sockfd, "pasv\n", strlen("pasv\n"));
+        printf("$client: %s", user);
+    }
+
+    if(readServer(sockfd, status)<0){
+        printf("failed read");
+    };
+
 
     printf("\n >>> Fim da máquina de estados <<<");
 
-    /*send a string to the server*/
-
-    ////////////////// To be deleted after state machine implementation /////////////
-
-    bytes = read(sockfd, buf, strlen(buf)); 
-    if (bytes > 0){
-        printf("\nBytes lidos %ld\n", bytes);
-
-        for(int i = 0; i < bytes; i++){
-            printf("%c", buf[i]);
-        }
-
-        auth_bytes = write(sockfd, username_buf, strlen(username_buf));
-        if (auth_bytes > 0){
-            printf("\nBytes escritos - username %ld\n", auth_bytes);
-
-            //Le a resposta se escreveu o username bem
-            auth_bytes = read(sockfd, buf, strlen(buf));
-            if (bytes > 0){
-
-                for(int i = 0; i < 3; i++)
-                    printf("%c", buf[i]);
-
-                auth_bytes = write(sockfd, password_buf, strlen(password_buf));
-                if (auth_bytes > 0)
-                    printf("\nBytes escritos - password %ld\n", auth_bytes);
-            }
-        }
-        else {
-            printf("\nError during username write! Aborting operation\n");
-            exit(-1);
-        }
-    }
-
-    ////////////////////////////////////////////////////////////////////////////
-
-    else {
-        perror("read()");
-        exit(-1);
-    }
 
     if (close(sockfd)<0) {
         perror("close()");
