@@ -33,6 +33,8 @@ int main(int argc, char **argv) {
     char password[MAX_LENGTH];
     char host[MAX_LENGTH];
     char urlpath[MAX_LENGTH];
+    int sockfd;
+    size_t bytes;
 
     if (argc != 2) {
         printf("Usage: %s %s\n", argv[0], "ftp://[<user>:<password>@]<host>/<url-path>");
@@ -43,28 +45,8 @@ int main(int argc, char **argv) {
         return -1;
     }
 
-    int sockfd;
-    struct sockaddr_in server_addr;
-
-    size_t bytes;
-
-    /*server address handling*/
-    bzero((char *) &server_addr, sizeof(server_addr));
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = inet_addr(SERVER_ADDR);    /*32 bit Internet address network byte ordered*/
-    server_addr.sin_port = htons(SERVER_PORT);        /*server TCP port must be network byte ordered */
-
-    /*open a TCP socket*/
-    if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-        perror("socket()");
-        exit(-1);
-    }
-    /*connect to the server*/
-    if (connect(sockfd,
-                (struct sockaddr *) &server_addr,
-                sizeof(server_addr)) < 0) {
-        perror("connect()");
-        exit(-1);
+    if((sockfd = connectSocket(SERVER_ADDR, SERVER_PORT)) < 0){
+        return -1;
     }
 
     char status[3];
