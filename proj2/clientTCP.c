@@ -80,7 +80,14 @@ int main(int argc, char **argv) {
         printf("failed read");
     };
 
+    if(strcmp(status,"227")){
+        sendCommandToServer(sockfd, "RETR", urlpath);
+    }
 
+    if(readServer(sockfd, status)<0){
+        printf("failed read");
+    };
+    
     printf("\n >>>Fim<<<");
 
 
