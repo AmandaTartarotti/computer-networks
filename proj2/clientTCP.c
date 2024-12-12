@@ -34,31 +34,30 @@ int main(int argc, char **argv) {
     char host[MAX_LENGTH];
     char urlpath[MAX_LENGTH];
     int sockfd;
-    size_t bytes;
 
     if (argc != 2) {
         printf("Usage: %s %s\n", argv[0], "ftp://[<user>:<password>@]<host>/<url-path>");
         return -1;
     }
 
-    if (get_url_info(argv[1], username, password, host, urlpath) != 0) {
-        return -1;
-    }
+    if (get_url_info(argv[1], username, password, host, urlpath) != 0) return -1;
 
-    if((sockfd = connectSocket(SERVER_ADDR, SERVER_PORT)) < 0){
+    if (get_ip(host) != 0) return -1;
+
+    if((sockfd = connectSocket(host, SERVER_PORT)) < 0){
         return -1;
     }
 
     char status[3];
     printf("$client: starts connection with the server\n");
     sleep(0.5);
+
     if(readServer(sockfd, status)<0){
         printf("failed read");
     };
     
     if(strcmp(status,"220")){
-        bytes = write(sockfd, "USER anonymous\n", strlen("USER anonymous\n"));
-        printf("$client: %s", "USER anonymous\n");
+        sendCommandToServer(sockfd, "USER", username);
     }
 
     if(readServer(sockfd, status)<0){
@@ -66,8 +65,7 @@ int main(int argc, char **argv) {
     };
 
     if(strcmp(status,"331")){
-        bytes = write(sockfd, "PASS anonymous\n", strlen("PASS anonymous\n"));
-        printf("$client: %s", "PASS anonymous\n");
+        sendCommandToServer(sockfd, "PASS", password);
     }
 
     if(readServer(sockfd, status)<0){
@@ -75,8 +73,7 @@ int main(int argc, char **argv) {
     };
 
     if(strcmp(status,"230")){
-        bytes = write(sockfd, "pasv\n", strlen("pasv\n"));
-        printf("$client: %s", "pasv\n");
+        sendCommandToServer(sockfd, "pasv", "");
     }
 
     if(readServer(sockfd, status)<0){
@@ -84,7 +81,7 @@ int main(int argc, char **argv) {
     };
 
 
-    printf("\n >>> Fim da máquina de estados <<<");
+    printf("\n >>>Fim<<<");
 
 
     if (close(sockfd)<0) {

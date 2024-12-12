@@ -8,6 +8,8 @@
  */
 int get_url_info(char *argv, char *username, char *password, char *host, char *urlpath);
 
+int get_ip(char *host);
+
 int connectSocket(char *address, int port);
 
 /**
@@ -20,5 +22,7 @@ int recived_status(unsigned char* buf, unsigned char* status);
 
 
 int readServer(int sockfd, char *status);
+
+int sendCommandToServer(int sockfd, char *cmd, char *body);
 
 #endif

@@ -4,6 +4,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <netdb.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include "aux_functions.h"
@@ -41,6 +42,18 @@ int get_url_info(char *argv, char *username, char *password, char *host, char *u
   }
   return 0;
 
+}
+
+int get_ip(char *host) {
+  struct hostent *h;
+  if ((h = gethostbyname(host)) == NULL) {
+        herror("gethostbyname()");
+        return -1;
+    }
+
+  strcpy(host, inet_ntoa(*((struct in_addr *) h->h_addr)));
+
+  return 0;
 }
 
 int connectSocket(char *address, int port) {
@@ -86,4 +99,20 @@ int readServer(int sockfd, char *status)
     return -1;
 
   return 0;
+}
+
+int sendCommandToServer(int sockfd, char *cmd, char *body){
+  char aux[1000] = {0};
+
+  strcpy(aux, cmd);
+  strcat(aux, " ");
+  strcat(aux, body);
+  strcat(aux, "\n");
+
+  if(write(sockfd, aux, strlen(aux)) < 0) return -1;
+  
+  printf("$client: %s", aux);
+
+  return 0;
+
 }
