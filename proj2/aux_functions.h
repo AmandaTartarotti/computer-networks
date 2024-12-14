@@ -25,4 +25,6 @@ int readServer(int sockfd, char *status);
 
 int sendCommandToServer(int sockfd, char *cmd, char *body);
 
+int retrieveFile(int sockfd, char *urlpath, char *address);
+
 #endif

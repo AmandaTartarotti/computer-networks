@@ -76,17 +76,18 @@ int main(int argc, char **argv) {
         sendCommandToServer(sockfd, "pasv", "");
     }
 
-    if(readServer(sockfd, status)<0){
-        printf("failed read");
-    };
-
-    if(strcmp(status,"227")){
-        sendCommandToServer(sockfd, "RETR", urlpath);
+    if( retrieveFile(sockfd, urlpath, host) != 0) {
+        printf("failed retrieve\n");
     }
 
     if(readServer(sockfd, status)<0){
         printf("failed read");
     };
+
+    // if(strcmp(status,"230")){
+    //     sendCommandToServer(sockfd, "pasv", "");
+    // }
+
     
     printf("\n >>>Fim<<<");
 
