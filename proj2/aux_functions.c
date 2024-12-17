@@ -100,6 +100,7 @@ int readServer(int sockfd, char *status)
   {
     buf[bytes] = '\0';
     memcpy(status, buf, 3);
+    status[3] = '\0';
     printf("$Server: %s", buf);
   }
   else
@@ -131,60 +132,72 @@ int retrieveFile(int sockfd, char *urlpath, char *address)
   memset(buf, ' ', 1024);
   char status[4];
   size_t bytes;
-  if((bytes = read(sockfd, buf, strlen(buf) - 1))< 1){
+  if ((bytes = read(sockfd, buf, strlen(buf) - 1)) < 1)
+  {
     return -1;
   }
   buf[bytes] = '\0';
   printf("$server:%s", buf);
 
   memcpy(status, buf, 3);
-
-  if(strcmp(status, "227")){
+  status[3] = '\0';
+  if (strcmp(status, "227") == 0)
+  {
     sendCommandToServer(sockfd, "RETR", urlpath);
   }
+  else
+  {
+    printf("Error in the pasv mode\n");
+    return -1;
+  }
 
-  //Gets the right port to connect the other socket
+  // Gets the right port to connect the other socket
   int p1, p2;
   sscanf(buf, "227 Entering Passive Mode (193,137,29,15,%d,%d).", &p1, &p2);
   int port = p1 * 256 + p2;
 
   int sockfile = connectSocket(address, port);
 
-  //gets the filename to create the file
+  // gets the filename to create the file
   char filename[256];
   sscanf(urlpath, "%*[^/]/%255[^\n]", filename);
   printf("Downloading file %s\n", filename);
 
   FILE *fp = fopen(filename, "w");
-  if (fp == NULL){
-      printf("Error opening or creating file\n");
-      return -1;
+  if (fp == NULL)
+  {
+    printf("Error opening or creating file\n");
+    return -1;
   }
 
   char filebuf[1024];
   int n_bytes;
 
-  while((n_bytes = read(sockfile, filebuf, sizeof(filebuf)))){
-        if(n_bytes < 0){
-            printf("Error reading from data socket\n");
-            return -1;
-        }
-        if((n_bytes = fwrite(filebuf, n_bytes, 1, fp)) < 0){
-            printf("Error writing data to file\n");
-            return -1;
-        }
+  while ((n_bytes = read(sockfile, filebuf, sizeof(filebuf))) > 0)
+  {
+    if (n_bytes < 0)
+    {
+      printf("Error reading from data socket\n");
+      return -1;
     }
-    printf("Finished dowloading File\n");
-    if(fclose(fp) < 0){
-        printf("Error closing file\n");
-        return -1;
+    if ((n_bytes = fwrite(filebuf, n_bytes, 1, fp)) < 0)
+    {
+      printf("Error writing data to file\n");
+      return -1;
     }
+  }
+  printf("Finished dowloading File\n");
+  if (fclose(fp) < 0)
+  {
+    printf("Error closing file\n");
+    return -1;
+  }
 
-    if (close(sockfile)<0) {
-        perror("close()");
-        exit(-1);
-    }
-
+  if (close(sockfile) < 0)
+  {
+    perror("close()");
+    exit(-1);
+  }
 
   return 0;
 }
