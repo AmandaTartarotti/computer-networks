@@ -27,4 +27,6 @@ int sendCommandToServer(int sockfd, char *cmd, char *body);
 
 int retrieveFile(int sockfd, char *urlpath, char *address);
 
+char* get_filename(char* path);
+
 #endif

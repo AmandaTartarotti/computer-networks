@@ -1,7 +1,3 @@
-/**      (C)2000-2021 FEUP
- *       tidy up some includes and parameters
- * */
-
 #include <stdio.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -62,8 +58,6 @@ int main(int argc, char **argv)
         printf("failed read");
     };
 
-    printf("%s\n", status);
-
     if (strcmp(status, "220") == 0)
     {
         sendCommandToServer(sockfd, "USER", username);
@@ -118,16 +112,14 @@ int main(int argc, char **argv)
         return -1;
     };
 
-    // if(strcmp(status,"230")){
-    //     sendCommandToServer(sockfd, "pasv", "");
-    // }
-
-    printf("\n >>>Fim<<<");
 
     if (close(sockfd) < 0)
     {
         perror("close()");
         exit(-1);
     }
+
+    printf("\n >>>Fim<<<\n");
+    
     return 0;
 }

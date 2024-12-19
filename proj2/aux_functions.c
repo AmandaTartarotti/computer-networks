@@ -159,9 +159,8 @@ int retrieveFile(int sockfd, char *urlpath, char *address)
   int sockfile = connectSocket(address, port);
 
   // gets the filename to create the file
-  char filename[256];
-  sscanf(urlpath, "%*[^/]/%255[^\n]", filename);
-  printf("Downloading file %s\n", filename);
+  char* filename = get_filename(urlpath);
+  printf("filename: %s\n", filename);
 
   FILE *fp = fopen(filename, "w");
   if (fp == NULL)
@@ -200,4 +199,12 @@ int retrieveFile(int sockfd, char *urlpath, char *address)
   }
 
   return 0;
+}
+
+char* get_filename(char* path) {
+    char* filename = strrchr(path, '/'); // Find the last '/'
+    if (filename) {
+        return filename + 1; // Skip the '/'
+    }
+    return path; // No '/' found, path itself is the filename
 }
