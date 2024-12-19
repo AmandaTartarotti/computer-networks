@@ -142,14 +142,29 @@ int retrieveFile(int sockfd, char *urlpath, char *address)
   buf[bytes] = '\0';
   printf("$server:%s", buf);
 
+  // Gets the right port to connect the other socket
+  int a1, a2, a3, a4, p1, p2, port;
+  if (sscanf(buf, "227 Entering Passive Mode (%d,%d,%d,%d,%d,%d)", &a1, &a2, &a3, &a4, &p1, &p2) == 6)
+  {
+    port = p1 * 256 + p2;
+    printf("p1 -- %d, p2 -- %d, port -- %d\n", p1, p2, port);
+  }
+  else
+  {
+    printf("Error parsing PASV response\n");
+    return -1;
+  }
+
+  int sockfile = connectSocket(address, port);
+
   memcpy(status, buf, 3);
   status[3] = '\0';
   if (strcmp(status, "227") == 0)
   {
     if (sendCommandToServer(sockfd, "RETR", urlpath) < 0)
     {
-        printf("Failed to send RETR command\n");
-        return -1;
+      printf("Failed to send RETR command\n");
+      return -1;
     }
   }
   else
@@ -158,22 +173,16 @@ int retrieveFile(int sockfd, char *urlpath, char *address)
     return -1;
   }
 
-  // Gets the right port to connect the other socket
-  int a1,a2,a3,a4,p1, p2,port;
-  if (sscanf(buf, "227 Entering Passive Mode (%d,%d,%d,%d,%d,%d)", &a1, &a2, &a3, &a4, &p1, &p2) == 6) {
-      port = p1 * 256 + p2;
-      printf("p1 -- %d, p2 -- %d, port -- %d\n", p1, p2, port);
-      printf("Connecting to %d.%d.%d.%d:%d\n", a1, a2, a3, a4, port);
-  } 
-  else {
-    printf("Error parsing PASV response\n");
+  if (readServer(sockfd,status) != 0)
+  {
     return -1;
   }
 
-  int sockfile = connectSocket(address, port);
+  if (strcmp(status, "550") == 0) return -1;
+
 
   // gets the filename to create the file
-  char* filename = get_filename(urlpath);
+  char *filename = get_filename(urlpath);
 
   printf("filename: %s\n", filename);
 
