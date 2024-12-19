@@ -51,7 +51,7 @@ int main(int argc, char **argv)
 
     char status[4];
     printf("$client: starts connection with the server\n");
-    sleep(0.5);
+    sleep(1);
 
     if (readServer(sockfd, status) < 0)
     {
@@ -100,6 +100,7 @@ int main(int argc, char **argv)
         return -1;
     }
 
+    printf("Let's start retriving\n");
     if (retrieveFile(sockfd, urlpath, host) != 0)
     {
         printf("failed retrieve\n");
